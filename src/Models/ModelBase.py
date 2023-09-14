@@ -1,0 +1,180 @@
+# standard python libraries
+import numpy as np
+import torch
+import torch.nn as nn
+import os, time
+from torch.utils.tensorboard import SummaryWriter
+from matplotlib.backends.backend_pdf import PdfPages
+import os
+
+# Other functions of project
+from Source.Util.util import get, get_device
+
+
+
+class GenerativeModel(nn.Module):
+    """
+    Base Class for Generative Models to inherit from.
+    Children classes should overwrite the individual methods as needed.
+    Every child class MUST overwrite the methods:
+
+    def build_net(self): should register some NN architecture as self.net
+    def batch_loss(self, x): takes a batch of samples as input and returns the loss
+    def sample_n_parallel(self, n_samples): generates and returns n_samples new samples
+
+    See tbd.py for an example of child class
+
+    Structure:
+
+    __init__(params)      : Read in parameters and register the important ones
+    build_net()           : Create the NN and register it as self.net
+                            HAS TO BE OVERWRITTEN IN CHILD CLASS
+    prepare_training()    : Read in the appropriate parameters and prepare the model for training
+                            Currently this is called from run_training(), so it should not be called on its own
+    run_training()        : Run the actual training.
+                            Necessary parameters are read in and the training is performed.
+                            This calls on the methods train_one_epoch() and validate_one_epoch()
+    train_one_epoch()     : Performs one epoch of model training.
+                            This calls on the method batch_loss(x)
+    validate_one_epoch()  : Performs one epoch of validation.
+                            This calls on the method batch_loss(x)
+    batch_loss(x)         : Takes one batch of samples as input and returns the loss.
+                            HAS TO BE OVERWRITTEN IN CHILD CLASS
+    sample_n(n_samples)   : Generates and returns n_samples new samples as a numpy array
+                            HAS TO BE OVERWRITTEN IN CHILD CLASS
+    sample_and_plot       : Generates n_samples and makes plots with them.
+                            This is meant to be used during training if intermediate plots are wanted
+
+    """
+    def __init__(self, params):
+        """
+        :param params: file with all relevant model parameters
+        """
+        super().__init__()
+        self.params = params
+        self.device = get(self.params, "device", get_device())
+        self.dim = self.params["dim"]
+        self.conditional = get(self.params,'conditional',False)
+
+        self.batch_size = self.params["batch_size"]
+        self.batch_size_sample = get(self.params, "batch_size_sample", self.batch_size)
+
+        self.epoch = get(self.params, "total_epochs", 0)
+        self.net = self.build_net()
+        self.iterations = get(self.params,"iterations", 1)
+        self.regular_loss = []
+        self.kl_loss = []
+
+        self.runs = get(self.params, "runs", 0)
+        self.iterate_periodically = get(self.params, "iterate_periodically", False)
+
+    def build_net(self):
+        pass
+
+    def prepare_training(self):
+        print("train_model: Preparing model training")
+        self.use_scheduler = get(self.params, "use_scheduler", False)
+        self.train_losses = np.array([])
+        self.train_losses_epoch = np.array([])
+        self.n_trainbatches = len(self.train_loader)
+        self.n_traindata = len(self.data_train_raw)
+
+        self.sample_periodically = get(self.params, "sample_periodically", False)
+        if self.sample_periodically:
+            self.sample_every = get(self.params, "sample_every", 1)
+            self.sample_every_n_samples = get(self.params, "sample_every_n_samples", 100000)
+            print(f'train_model: sample_periodically set to True. Sampling {self.sample_every_n_samples} every'
+                  f' {self.sample_every} epochs. This may significantly slow down training!')
+
+        self.log = get(self.params, "log", True)
+        if self.log:
+            log_dir = os.path.join(self.params["out_dir"], "logs")
+            self.logger = SummaryWriter(log_dir)
+            print(f"train_model: Logging to log_dir {log_dir}")
+        else:
+            print("train_model: log set to False. No logs will be written")
+
+    def run_training(self):
+
+        self.prepare_training()
+        samples = []
+        n_epochs = get(self.params, "n_epochs", 100)
+        past_epochs = get(self.params, "total_epochs", 0)
+        print(f"train_model: Model has been trained for {past_epochs} epochs before.")
+        print(f"train_model: Beginning training. n_epochs set to {n_epochs}")
+        for e in range(n_epochs):
+            t0 = time.time()
+
+            self.epoch = past_epochs + e
+            self.train()
+            self.train_one_epoch()
+
+            if self.sample_periodically:
+                if (self.epoch + 1) % self.sample_every == 0:
+                    self.eval()
+
+                    # if true then i * bayesian samples will be drawn, else just 1
+                    iterations = self.iterations if self.iterate_periodically else 1
+                    bay_samples = []
+                    for i in range(0, iterations):
+                        sample = self.sample_n(self.sample_every_n_samples)
+                        bay_samples.append(sample)
+
+                    samples = np.concatenate(bay_samples)
+                    self.plot_samples(samples=samples)
+
+            # save model periodically, useful when trying to understand how weights are learned over iterations
+            if get(self.params,"save_periodically",False):
+                if (self.epoch + 1) % get(self.params,"save_every",10) == 0 or self.epoch==0:
+                    torch.save(self.state_dict(), f"models/model_epoch_{e+1}.pt")
+
+            # estimate training time
+            if e==0:
+                t1 = time.time()
+                dtEst= (t1-t0) * n_epochs
+                print(f"Training time estimate: {dtEst/60:.2f} min = {dtEst/60**2:.2f} h")
+
+    def train_one_epoch(self):
+        # create list to save train_loss
+        train_losses = np.array([])
+
+        # iterate batch wise over input
+        for batch_id, x in enumerate(self.train_loader):
+
+            self.optimizer.zero_grad()
+
+            # calculate batch loss
+            loss = self.batch_loss(x)
+
+            if np.isfinite(loss.item()): # and (abs(loss.item() - loss_m) / loss_s < 5 or len(self.train_losses_epoch) == 0):
+                loss.backward()
+                self.optimizer.step()
+                train_losses = np.append(train_losses, loss.item())
+                if self.log:
+                    self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+
+                if self.use_scheduler:
+                    self.scheduler.step()
+                    if self.log:
+                        self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
+                                               self.epoch * self.n_trainbatches + batch_id)
+
+            else:
+                print(f"train_model: Unstable loss. Skipped backprop for epoch {self.epoch}, batch_id {batch_id}")
+
+        self.train_losses_epoch = np.append(self.train_losses_epoch, train_losses.mean())
+        self.train_losses = np.concatenate([self.train_losses, train_losses], axis=0)
+        if self.log:
+            self.logger.add_scalar("train_losses_epoch", self.train_losses_epoch[-1], self.epoch)
+            if self.use_scheduler:
+                self.logger.add_scalar("learning_rate_epoch", self.scheduler.get_last_lr()[0],
+                                       self.epoch)
+
+    def batch_loss(self, x):
+        pass
+
+    def sample_n(self, n_samples):
+        pass
+
+    def plot_samples(self, samples, finished=False):
+        pass
