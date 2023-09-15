@@ -8,9 +8,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 import os
 
 # Other functions of project
-from Source.Util.util import get, get_device
-
-
+from Util.util import *
+from data_util import get_loaders
+from transforms import *
 
 class GenerativeModel(nn.Module):
     """
@@ -46,14 +46,14 @@ class GenerativeModel(nn.Module):
                             This is meant to be used during training if intermediate plots are wanted
 
     """
-    def __init__(self, params):
+    def __init__(self, params, device):
         """
         :param params: file with all relevant model parameters
         """
         super().__init__()
         self.params = params
-        self.device = get(self.params, "device", get_device())
-        self.dim = self.params["dim"]
+        self.device = device
+        #self.dim = self.params["dim"]
         self.conditional = get(self.params,'conditional',False)
 
         self.batch_size = self.params["batch_size"]
@@ -67,6 +67,19 @@ class GenerativeModel(nn.Module):
 
         self.runs = get(self.params, "runs", 0)
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
+        
+        #init preprocessing
+        transforms = params.get('transforms') #get_transformations(params.get('transforms', None))
+        self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
+                                                                    params.get('particle_type'),
+                                                                    params.get('xml_filename'),
+                                                                    params.get('val_frac'),
+                                                                    params.get('batch_size'),
+                                                                    transforms,
+                                                                    params.get('eps', 1.e-10),
+                                                                    device=device,
+                                                                    shuffle=True,
+                                                                    width_noise=params.get('width_noise', 1.e-6)) 
 
     def build_net(self):
         pass
@@ -76,6 +89,9 @@ class GenerativeModel(nn.Module):
         self.use_scheduler = get(self.params, "use_scheduler", False)
         self.train_losses = np.array([])
         self.train_losses_epoch = np.array([])
+        self.val_losses = np.array([])
+        self.val_losses_epoch = np.array([])
+
         self.n_trainbatches = len(self.train_loader)
         self.n_traindata = len(self.data_train_raw)
 
@@ -108,6 +124,10 @@ class GenerativeModel(nn.Module):
             self.epoch = past_epochs + e
             self.train()
             self.train_one_epoch()
+            
+            if (self.epoch + 1) % self.validate_every == 0:
+                self.eval()
+                self.validate_one_epoch()
 
             if self.sample_periodically:
                 if (self.epoch + 1) % self.sample_every == 0:
@@ -169,6 +189,25 @@ class GenerativeModel(nn.Module):
             if self.use_scheduler:
                 self.logger.add_scalar("learning_rate_epoch", self.scheduler.get_last_lr()[0],
                                        self.epoch)
+
+    def validate_one_epoch(self):
+        val_losses = np.array([])
+
+        # iterate batch wise over input
+        with torch.no_grad():
+            for batch_id, x in enumerate(self.val_loader):
+
+                # calculate batch loss
+                loss = self.batch_loss(x)
+
+                val_losses = np.append(val_losses, loss.item())
+                if self.log:
+                    self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+
+            self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
+            self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
+            if self.log:
+                self.logger.add_scalar("val_losses_epoch", self.val_losses_epoch[-1], self.epoch)
 
     def batch_loss(self, x):
         pass

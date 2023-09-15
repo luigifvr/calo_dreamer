@@ -2,9 +2,11 @@ import numpy as np
 import h5py
 import torch
 
-from myDataLoader import MyDataLoader
+from torch.utils.data import DataLoader
+#from myDataLoader import MyDataLoader
 from challenge_files.XMLHandler import XMLHandler
 import challenge_files.HighLevelFeatures as HLF
+from datasets import CaloChallengeDataset
 
 def load_data_calo(filename, layer_boundaries, energy=None):
     data = {}
@@ -427,10 +429,23 @@ def save_hlf(hlf, filename):
         pickle.dump(hlf, file)
     print("Saving file with high-level features DONE.")
 
+def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
+                transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,):
+
+    train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
+                    val_frac=val_frac, transform=transforms, split='training')
+    val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
+                    val_frac=val_frac, transform=transforms, split='validation')
+
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    val_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    return train_dataloader, val_dataloader, train_dataset.layer_boundaries
+
+"""
 def get_loaders(filename, xml_filename, particle_type, val_frac, batch_size, 
                 eps=1.e-10, device='cpu', drop_last=False, shuffle=True, 
                 width_noise=0.0, energy=None, u0up_cut=7.0, u0low_cut=0.0, rew=1.0):
-    """Creates the dataloaders used to train the VAE model."""
+    Creates the dataloaders used to train the VAE model.
     
     # load the data from the hdf5 file
     data, layer_boundaries = load_data(filename, particle_type, xml_filename=xml_filename, energy=energy)
@@ -475,6 +490,7 @@ def get_loaders(filename, xml_filename, particle_type, val_frac, batch_size,
     trn_loader = MyDataLoader(x_trn, c_trn, batch_size, drop_last, shuffle, width_noise)
     val_loader = MyDataLoader(x_val, c_val, batch_size, drop_last, shuffle, width_noise)
     return trn_loader, val_loader, layer_boundaries
+"""
 
 def get_hlf(shower, particle_type, layer_boundaries, threshold=1.e-4):
     "returns a hlf class needed for plotting"

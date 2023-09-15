@@ -3,12 +3,13 @@ import torch
 import numpy as np
 
 from torch.utils.data import Dataset, DataLoader
-from data_util import *
+from Util.util import *
 from transforms import *
 
 class CaloChallengeDataset(Dataset):
     """ Dataset for CaloChallenge showers """
-    def __init__(self, hdf5_file, particle_type, xml_filename, transform=None):
+    def __init__(self, hdf5_file, particle_type, xml_filename, val_frac=0.3, 
+            transform=None, split='training', device='cpu'):
         """
         Arguments:
             hdf5_file: path to hdf5 file
@@ -21,17 +22,17 @@ class CaloChallengeDataset(Dataset):
         
         del self.data
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
-
         self.transform = transform
+        self.device = device
 
     def __len__(self):
         return len(self.energy)
 
     def __getitem__(self, idx):
-        showers = torch.tensor(self.layers[idx])
-        energies = torch.tensor(self.energy[idx])
+        showers = torch.tensor(self.layers[idx]).to(self.device)
+        energies = torch.tensor(self.energy[idx]).to(self.device)
 
         if self.transform:
             for fn in self.transform:
-                showers, energies = fn(showers, energies)
+                showers, energies = eval(fn)(showers, energies)
         return showers, energies

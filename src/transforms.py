@@ -1,5 +1,13 @@
 import torch
 
+
+def get_transforms(list_tr):
+    transforms = []
+    for i in list_tr:
+        if i == 'std':
+            pass
+    return transforms
+
 class Standardize(object):
     """
     Standardize features 

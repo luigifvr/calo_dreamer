@@ -3,6 +3,10 @@ import torch.utils.data
 import yaml
 import math
 import numpy as np
+import h5py
+
+from challenge_files.XMLHandler import XMLHandler
+import challenge_files.HighLevelFeatures as HLF
 
 """
 Some useful utility functions that don"t fit in anywhere else
@@ -75,3 +79,56 @@ def cosine_beta_schedule(timesteps, s = 0.008):
     alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
     betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
     return torch.clip(betas, 0, 0.999)
+
+
+def load_data(filename, particle_type,  xml_filename, threshold=1e-5, energy=None):
+    """Loads the data for a dataset 1 from the calo challenge"""
+    
+    # Create a XML_handler to extract the layer boundaries. (Geometric setup is stored in the XML file)
+    xml_handler = XMLHandler(particle_name=particle_type, 
+    filename=xml_filename)
+    
+    layer_boundaries = np.unique(xml_handler.GetBinEdges())
+
+    # Prepare a container for the loaded data
+    data = {}
+
+    # Load and store the data. Make sure to slice according to the layers.
+    # Also normalize to 100 GeV (The scale of the original data is MeV)
+    data_file = h5py.File(filename, 'r')
+    #data["energy"] = data_file["incident_energies"][:] / 1.e3
+    if energy is not None:
+        energy_mask = data_file["incident_energies"][:] == energy
+        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1) / 1.e3
+        for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()] / 1.e3
+    else:
+        data["energy"] = data_file["incident_energies"][:] / 1.e3
+        for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end] / 1.e3
+    data_file.close()
+    
+    return data, layer_boundaries
+
+def get_energy_and_sorted_layers(data):
+    """returns the energy and the sorted layers from the data dict"""
+    
+    # Get the incident energies
+    energy = data["energy"]
+
+    # Get the number of layers layers from the keys of the data array
+    number_of_layers = len(data)-1
+    
+    # Create a container for the layers
+    layers = []
+
+    # Append the layers such that they are sorted.
+    for layer_index in range(number_of_layers):
+        layer = f"layer_{layer_index}"
+        
+        layers.append(data[layer])
+       
+    layers = np.concatenate(layers, axis=1)
+            
+    return energy, layers
+
