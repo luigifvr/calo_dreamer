@@ -2,15 +2,17 @@ import argparse
 import os
 import shutil
 import yaml
+import torch
 
 from documenter import Documenter
 from Models import *
+from Models.tbd import TBD
 from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
     parser.add_argument('param_file', help='yaml parameters file')
-    parser.add_argument('-c', '--usa_cuda', action='store_true', default=False,)
+    parser.add_argument('-c', '--use_cuda', action='store_true', default=False,)
     parser.add_argument('-p', '--plot', action='store_true', default=False,)
     parser.add_argument('-d', '--model_dir', default=None,)
     parser.add_argument('-its', '--model_name')
@@ -19,7 +21,8 @@ def main():
 
     with open(args.param_file) as f:
         params = yaml.load(f, Loader=yaml.FullLoader)
-    usa_cuda = torch.cuda.is_available() and args.use_cuda
+    use_cuda = torch.cuda.is_available() and args.use_cuda
+
     device = 'cuda:0' if use_cuda else 'cpu'
     print('device: ', device)
 
@@ -41,11 +44,11 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params)
+    model = TBD(params, device)
     model.run_training()
 
     #run plotting script
-    evaluate.main(f"-i {doc.basedir}/samples.hdf5 -r {params['val_data_path']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
+    evaluate.main(f"-i {doc.basedir}/samples.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
 
 if __name__=='__main__':
     main()

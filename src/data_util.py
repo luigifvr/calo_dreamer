@@ -433,9 +433,9 @@ def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
                 transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,):
 
     train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
-                    val_frac=val_frac, transform=transforms, split='training')
+                    val_frac=val_frac, transform=transforms, split='training', device=device)
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
-                    val_frac=val_frac, transform=transforms, split='validation')
+                    val_frac=val_frac, transform=transforms, split='validation', device=device)
 
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     val_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)

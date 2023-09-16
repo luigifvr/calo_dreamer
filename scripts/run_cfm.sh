@@ -9,4 +9,4 @@ source activate /remote/gpu06/favaro/.conda/pytorch
 mydev=`cat $PBS_GPUFILE | sed s/.*-gpu// `
 export CUDA_VISIBLE_DEVICES=$mydev
 cd /remote/gpu06/favaro/calo_dreamer/
-python3 src/main.py params/single_E/bayes_E256.yml -c
+python3 src/main.py /remote/gpu06/favaro/calo_dreamer//configs/cfm_base.yaml -c

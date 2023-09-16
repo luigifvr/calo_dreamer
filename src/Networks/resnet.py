@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from Source.Networks.vblinear import VBLinear
+from Networks.vblinear import VBLinear
 
 
 class Resnet(nn.Module):

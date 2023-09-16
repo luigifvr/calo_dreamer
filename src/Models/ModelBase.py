@@ -53,7 +53,7 @@ class GenerativeModel(nn.Module):
         super().__init__()
         self.params = params
         self.device = device
-        #self.dim = self.params["dim"]
+        self.dim = self.params["dim"]
         self.conditional = get(self.params,'conditional',False)
 
         self.batch_size = self.params["batch_size"]
@@ -67,6 +67,7 @@ class GenerativeModel(nn.Module):
 
         self.runs = get(self.params, "runs", 0)
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
+        self.validate_every = get(self.params, "validate_every", 50)
         
         #init preprocessing
         transforms = params.get('transforms') #get_transformations(params.get('transforms', None))
@@ -93,7 +94,8 @@ class GenerativeModel(nn.Module):
         self.val_losses_epoch = np.array([])
 
         self.n_trainbatches = len(self.train_loader)
-        self.n_traindata = len(self.data_train_raw)
+        self.n_traindata = self.n_trainbatches*self.batch_size
+        self.set_optimizer(steps_per_epoch=self.n_trainbatches)
 
         self.sample_periodically = get(self.params, "sample_periodically", False)
         if self.sample_periodically:
@@ -109,6 +111,59 @@ class GenerativeModel(nn.Module):
             print(f"train_model: Logging to log_dir {log_dir}")
         else:
             print("train_model: log set to False. No logs will be written")
+
+    def set_optimizer(self, steps_per_epoch=1, params=None):
+        """ Initialize optimizer and learning rate scheduling """
+        if params is None:
+            params = self.params
+
+        self.optimizer = torch.optim.AdamW(
+                self.net.parameters(),
+                lr = params.get("lr", 0.0002),
+                betas = params.get("betas", [0.9, 0.999]),
+                eps = params.get("eps", 1e-6),
+                weight_decay = params.get("weight_decay", 0.)
+                )
+
+        self.lr_sched_mode = params.get("lr_scheduler", "reduce_on_plateau")
+        if self.lr_sched_mode == "step":
+            self.scheduler = torch.optim.lr_scheduler.StepLR(
+                    self.optimizer,
+                    step_size = params["lr_decay_epochs"],
+                    gamma = params["lr_decay_factor"],
+                    )
+        elif self.lr_sched_mode == "reduce_on_plateau":
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    self.optimizer,
+                    factor = 0.8,
+                    patience = 50,
+                    cooldown = 100,
+                    threshold = 5e-5,
+                    threshold_mode = "rel",
+                    verbose=True
+                    )
+        elif self.lr_sched_mode == "one_cycle_lr":
+            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
+                self.optimizer,
+                params.get("max_lr", params["lr"]*10),
+                epochs = params.get("cycle_epochs") or params["n_epochs"],
+                steps_per_epoch=steps_per_epoch,
+                )
+        elif self.lr_sched_mode == "cycle_lr":
+            self.scheduler = torch.optim.lr_scheduler.CyclicLR(
+                self.optimizer,
+                base_lr = params.get("lr", 1.0e-4),
+                max_lr = params.get("max_lr", params["lr"]*10),
+                step_size_up= params.get("step_size_up", 2000),
+                mode = params.get("cycle_mode", "triangular"),
+                cycle_momentum = False,
+                    )
+        elif self.lr_sched_mode == "multi_step_lr":
+            self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    self.optimizer,
+                    milestones=[2730, 8190, 13650, 27300],
+                    gamma=0.5
+                    )
 
     def run_training(self):
 

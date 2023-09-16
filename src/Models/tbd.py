@@ -1,9 +1,10 @@
 import numpy as np
 import torch
 from scipy.integrate import solve_ivp
-import Source.Networks
-from Source.Util.util import get
-from Source.Models.ModelBase import GenerativeModel
+import Networks
+from Util.util import get
+from Models.ModelBase import GenerativeModel
+import Models
 
 
 class TBD(GenerativeModel):
@@ -12,11 +13,11 @@ class TBD(GenerativeModel):
      Inheriting from the GenerativeModel BaseClass
     """
 
-    def __init__(self, params):
-        super().__init__(params)
+    def __init__(self, params, device):
+        super().__init__(params, device)
         trajectory = get(self.params, "trajectory", "sine_cosine_trajectory")
         try:
-            self.trajectory = getattr(Source.Models.tbd, trajectory)
+            self.trajectory =  getattr(Models.tbd, trajectory)
         except AttributeError:
             raise NotImplementedError(f"build_model: Trajectory type {trajectory} not implemented")
 
@@ -34,7 +35,7 @@ class TBD(GenerativeModel):
         """
         network = get(self.params, "network", "Resnet")
         try:
-            return getattr(Source.Networks, network)(self.params).to(self.device)
+            return getattr(Networks, network)(self.params).to(self.device)
         except AttributeError:
             raise NotImplementedError(f"build_model: Network class {network} not recognised")
 
@@ -43,8 +44,8 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        x = input.clone()
-        condition = None
+        x = input[0].clone()
+        condition = input[1]
         weights = None
         return x, condition, weights
 
@@ -54,8 +55,8 @@ class TBD(GenerativeModel):
         """
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
-
-        t = self.dist.sample((x.size(0),1)).to(x.device)
+        
+        t = torch.distributions.uniform.Uniform(low=0, high=1).sample((x.size(0),1)).to(x.device)
         x_0 = torch.randn_like(x)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
 
@@ -63,7 +64,7 @@ class TBD(GenerativeModel):
         drift = self.net(x_t, t, condition)
 
 
-        loss = torch.mean((drift - x_t_dot) ** 2 * torch.exp(self.t_factor * t))
+        loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
         self.regular_loss.append(loss.detach().cpu().numpy())
         if self.C != 0:
             kl_loss = self.C*self.net.kl / self.n_traindata

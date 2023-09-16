@@ -47,9 +47,9 @@ from sklearn.metrics import roc_auc_score
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 
-import HighLevelFeatures as HLF
+import challenge_files.HighLevelFeatures as HLF
 
-from evaluate_plotting_helper import *
+from challenge_files.evaluate_plotting_helper import *
 
 torch.set_default_dtype(torch.float64)
 

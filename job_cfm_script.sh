@@ -5,9 +5,10 @@ POW=$((2**I))
 ####Dirs####
 MAINDIR="/remote/gpu06/favaro/calo_dreamer/"
 DATADIR="/remote/gpu06/favaro/calo_inn/datasets/calo_challenge/"
+OUTDIR="/remote/gpu06/favaro/calo_dreamer/results/"
 
 ####Parameters####
-RUN_NAME="full_det_u3-01_rew085_5e6_photons_noclip_final${POW}"
+RUN_NAME="test_calo_dreamer"
 PTYPE="gamma"
 NOISE=5.0e-6
 W_DECAY=0.01
@@ -21,8 +22,8 @@ U0DOWN=0.0
 REW=0.7
 
 ####Training####
-EPS=250
-CYCLE=250
+EPS=50
+CYCLE=50
 SAVE_I=100
 BAYS="False"
 
@@ -37,6 +38,7 @@ mkdir $ARGSDIR
 
 cat << EOF > $YMLFILE
 run_name: ${RUN_NAME}
+out_dir: ${OUTDIR}${RUN_NAME}
 p_type: ${PTYPE}
 dtype: float32
 # Data
@@ -58,7 +60,9 @@ transforms: [NormalizeByEinc()]
 lr: 1.e-5
 max_lr: 1.e-4
 batch_size: ${BATCH_SZ}
+validate_every: 100
 
+use_scheduler: True
 lr_scheduler: one_cycle_lr
 
 weight_decay: ${W_DECAY}
@@ -80,6 +84,13 @@ dropout: 0.0
 bayesian: ${BAYS}
 prior_prec: 5000
 std_init: -15.0
+
+# ResNet block
+intermediate_dim: 128
+n_blocks: 4
+dim: 368
+n_con: 0
+layers_per_block: 2
 
 sub_layers: [linear, linear, linear]
 norm: True
@@ -108,11 +119,11 @@ source activate /remote/gpu06/favaro/.conda/pytorch
 mydev=\`cat \$PBS_GPUFILE | sed s/.*-gpu// \`
 export CUDA_VISIBLE_DEVICES=\$mydev
 cd ${MAINDIR}
-python3 src/main.py params/single_E/bayes_E${POW}.yml -c
+python3 src/main.py ${YMLFILE} -c
 EOF
 chmod +x $SUB_MODEL
 
-qsub $SUB_MODEL
+#qsub $SUB_MODEL
 echo "[INFO] Submitted job: config ${YMLFILE}"
 
 sleep 60

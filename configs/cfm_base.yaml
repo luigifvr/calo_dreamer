@@ -1,4 +1,5 @@
-run_name: full_det_u3-01_rew085_5e6_photons_noclip_final256
+run_name: test_calo_dreamer
+out_dir: /remote/gpu06/favaro/calo_dreamer/results/test_calo_dreamer
 p_type: gamma
 dtype: float32
 # Data
@@ -20,13 +21,15 @@ transforms: [NormalizeByEinc()]
 lr: 1.e-5
 max_lr: 1.e-4
 batch_size: 256
+validate_every: 100
 
+use_scheduler: True
 lr_scheduler: one_cycle_lr
 
 weight_decay: 0.01
 betas: [0.9, 0.999]
-n_epochs: 250
-cycle_epochs: 250
+n_epochs: 50
+cycle_epochs: 50
 save_interval: 100
 
 # Architecture
@@ -42,6 +45,13 @@ dropout: 0.0
 bayesian: False
 prior_prec: 5000
 std_init: -15.0
+
+# ResNet block
+intermediate_dim: 128
+n_blocks: 4
+dim: 368
+n_con: 0
+layers_per_block: 2
 
 sub_layers: [linear, linear, linear]
 norm: True
