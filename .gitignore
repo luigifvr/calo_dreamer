@@ -1,0 +1,6 @@
+/venv/
+/runs/
+/.idea
+/params
+.DS_Store
+*.ipynb
