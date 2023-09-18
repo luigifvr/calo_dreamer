@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import os, time
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import DataLoader
 from matplotlib.backends.backend_pdf import PdfPages
 import os
 
@@ -11,6 +12,7 @@ import os
 from Util.util import *
 from data_util import get_loaders
 from transforms import *
+
 
 class GenerativeModel(nn.Module):
     """
@@ -68,7 +70,7 @@ class GenerativeModel(nn.Module):
         self.runs = get(self.params, "runs", 0)
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
         self.validate_every = get(self.params, "validate_every", 50)
-        
+
         #init preprocessing
         transforms = params.get('transforms') #get_transformations(params.get('transforms', None))
         self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
@@ -80,7 +82,7 @@ class GenerativeModel(nn.Module):
                                                                     params.get('eps', 1.e-10),
                                                                     device=device,
                                                                     shuffle=True,
-                                                                    width_noise=params.get('width_noise', 1.e-6)) 
+                                                                    width_noise=params.get('width_noise', 1.e-6))
 
     def build_net(self):
         pass
@@ -179,7 +181,7 @@ class GenerativeModel(nn.Module):
             self.epoch = past_epochs + e
             self.train()
             self.train_one_epoch()
-            
+
             if (self.epoch + 1) % self.validate_every == 0:
                 self.eval()
                 self.validate_one_epoch()
@@ -267,7 +269,33 @@ class GenerativeModel(nn.Module):
     def batch_loss(self, x):
         pass
 
-    def sample_n(self, n_samples):
+    def generate_Einc_ds1(self, energy=None, sample_multiplier=1000):
+        """ generate the incident energy distribution of CaloChallenge ds1
+                        sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
+                        and 5, 3, 2, 1 times sample multiplier for the highest energies
+
+        """
+        ret = np.logspace(8, 18, 11, base=2)
+        ret = np.tile(ret, 10)
+        ret = np.array(
+            [*ret, *np.tile(2. ** 19, 5), *np.tile(2. ** 20, 3), *np.tile(2. ** 21, 2), *np.tile(2. ** 22, 1)])
+        ret = np.tile(ret, sample_multiplier)
+        if energy is not None:
+            ret = ret[ret == energy]
+        np.random.shuffle(ret)
+        return ret
+
+    def sample_n(self):
+        sample = []
+        condition = self.generate_Einc_ds1().to(self.device)
+        batch_size_sample = get(self.params, "batch_size_sample", 10000)
+        condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
+
+        for _, batch in enumerate(condition_loader):
+            sample.append(self.sample_batch(batch))
+        return np.concatenate(sample)
+
+    def sample_batch(self, batch):
         pass
 
     def plot_samples(self, samples, finished=False):
