@@ -1,6 +1,6 @@
 run_name: test_calo_dreamer
 out_dir: /remote/gpu06/favaro/calo_dreamer/results/test_calo_dreamer
-p_type: gamma
+p_type: photon
 dtype: float32
 # Data
 hdf5_file: /remote/gpu06/favaro/calo_inn/datasets/calo_challenge/gamma_data_1.hdf5
@@ -15,7 +15,10 @@ eval_dataset: "1-photons"
 u0up_cut: 3.0
 u0low_cut: 0.0
 pt_rew: 0.7
-transforms: [NormalizeByEinc()]
+transforms: {
+ NormalizeByElayer: {ptype: /remote/gpu06/favaro/calo_inn/datasets/calo_challenge/binning_dataset_1_photons.xml, xml_file: photon},
+ AddNoise: {noise_width: 5.0e-6}
+}
 
 # Training
 lr: 1.e-5

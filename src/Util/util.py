@@ -7,6 +7,7 @@ import h5py
 
 from challenge_files.XMLHandler import XMLHandler
 import challenge_files.HighLevelFeatures as HLF
+import transforms
 
 """
 Some useful utility functions that don"t fit in anywhere else
@@ -132,3 +133,8 @@ def get_energy_and_sorted_layers(data):
             
     return energy, layers
 
+def get_transformations(transforms_list):
+    func = []
+    for key, params in transforms_list.items():
+        func.append(getattr(transforms, key)(**params))
+    return func

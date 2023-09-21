@@ -72,13 +72,13 @@ class GenerativeModel(nn.Module):
         self.validate_every = get(self.params, "validate_every", 50)
 
         #init preprocessing
-        transforms = params.get('transforms') #get_transformations(params.get('transforms', None))
+        self.transforms = get_transformations(params.get('transforms', None))
         self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
                                                                     params.get('particle_type'),
                                                                     params.get('xml_filename'),
                                                                     params.get('val_frac'),
                                                                     params.get('batch_size'),
-                                                                    transforms,
+                                                                    self.transforms,
                                                                     params.get('eps', 1.e-10),
                                                                     device=device,
                                                                     shuffle=True,
@@ -194,11 +194,11 @@ class GenerativeModel(nn.Module):
                     iterations = self.iterations if self.iterate_periodically else 1
                     bay_samples = []
                     for i in range(0, iterations):
-                        sample = self.sample_n(self.sample_every_n_samples)
+                        sample, c = self.sample_n(self.sample_every_n_samples)
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
-                    self.plot_samples(samples=samples)
+                    self.plot_samples(samples=samples, conditions=c)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -292,11 +292,16 @@ class GenerativeModel(nn.Module):
         condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
 
         for _, batch in enumerate(condition_loader):
-            sample.append(self.sample_batch(batch))
-        return np.concatenate(sample)
+            sample.append(self.sample_batch(batch).detach().cpu().numpy())
+        return np.concatenate(sample), condition.detach().cpu().numpy()
 
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, finished=False):
-        pass
+    def plot_samples(self, samples, conditions, finished=False):
+        transforms = self.transforms
+
+        for fn in transforms[::-1]:
+            samples, conditions = fn(samples, conditions, rev=True)
+
+

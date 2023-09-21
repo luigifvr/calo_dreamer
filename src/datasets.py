@@ -29,10 +29,10 @@ class CaloChallengeDataset(Dataset):
         return len(self.energy)
 
     def __getitem__(self, idx):
-        showers = torch.tensor(self.layers[idx], dtype=torch.get_default_dtype()).to(self.device)
-        energies = torch.tensor(self.energy[idx], dtype=torch.get_default_dtype()).to(self.device)
+        showers = torch.clone(torch.tensor(self.layers[idx], dtype=torch.get_default_dtype()).to(self.device))
+        energies = torch.clone(torch.tensor(self.energy[idx], dtype=torch.get_default_dtype()).to(self.device))
 
         if self.transform:
             for fn in self.transform:
-                showers, energies = eval(fn)(showers, energies)
+                showers, energies = fn(showers, energies)
         return showers, energies

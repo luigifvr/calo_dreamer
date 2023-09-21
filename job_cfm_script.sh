@@ -6,10 +6,11 @@ POW=$((2**I))
 MAINDIR="/remote/gpu06/favaro/calo_dreamer/"
 DATADIR="/remote/gpu06/favaro/calo_inn/datasets/calo_challenge/"
 OUTDIR="/remote/gpu06/favaro/calo_dreamer/results/"
+XMLFILE="${DATADIR}binning_dataset_1_photons.xml"
 
 ####Parameters####
 RUN_NAME="test_calo_dreamer"
-PTYPE="gamma"
+PTYPE="photon"
 NOISE=5.0e-6
 W_DECAY=0.01
 NBLOCKS=12
@@ -43,7 +44,7 @@ p_type: ${PTYPE}
 dtype: float32
 # Data
 hdf5_file: ${DATADIR}gamma_data_1.hdf5
-xml_filename: ${DATADIR}binning_dataset_1_photons.xml
+xml_filename: ${XMLFILE}
 single_energy: null
 width_noise: ${NOISE}
 custom_noise: False
@@ -54,7 +55,10 @@ eval_dataset: "1-photons"
 u0up_cut: ${U0UP}
 u0low_cut: ${U0DOWN}
 pt_rew: ${REW}
-transforms: [NormalizeByEinc()]
+transforms: {
+ NormalizeByElayer: {ptype: ${XMLFILE}, xml_file: ${PTYPE}},
+ AddNoise: {noise_width: ${NOISE}}
+}
 
 # Training
 lr: 1.e-5
