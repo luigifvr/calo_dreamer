@@ -12,7 +12,7 @@ import os
 from Util.util import *
 from data_util import get_loaders
 from transforms import *
-
+from challenge_files import *
 
 class GenerativeModel(nn.Module):
     """
@@ -293,7 +293,12 @@ class GenerativeModel(nn.Module):
 
         for _, batch in enumerate(condition_loader):
             sample.append(self.sample_batch(batch).detach().cpu().numpy())
-        return np.concatenate(sample), condition.detach().cpu().numpy()
+
+        sample = np.concatenate(sample)
+        condition = condition.detach().cpu()
+
+        self.save_sample(sample, condition)
+        return sample, condition
 
     def sample_batch(self, batch):
         pass
@@ -302,6 +307,16 @@ class GenerativeModel(nn.Module):
         transforms = self.transforms
 
         for fn in transforms[::-1]:
-            samples, conditions = fn(samples, conditions, rev=True)
+            samples, conditions = fn(samples, conditions, rev=True ) # undo preprocessing
+        
+        evaluate.main(f"-i {self.params['out_dir']}/samples.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.params['out_dir']}/final/ --cut 0.0".split())
 
+    def save_sample(self, sample, energies):
+        """Save sample in the correct format"""
+    
+        save_file = h5py.File(self.params['out_dir']+'samples.hdf5', 'w')
+        save_file.create_dataset('incident_energies', data=energies)
+        save_file.create_dataset('showers', data=sample)
+        save_file.close()            
+ 
 
