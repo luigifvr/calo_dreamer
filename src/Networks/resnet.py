@@ -205,9 +205,9 @@ class Resnet(nn.Module):
             bay_layer.map = self.map
 
         # create network output
-        for block in self.blocks[:-1]:
+        x = self.blocks[0](torch.cat([x, add_input], 1))
+        for block in self.blocks[1:]:
             x = x + block(torch.cat([x, add_input], 1))
-        x = self.blocks[-1](torch.cat([x, add_input], 1))
 
         if self.add_final:
             x = nn.SiLU()(x)
