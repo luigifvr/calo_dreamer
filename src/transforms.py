@@ -55,7 +55,7 @@ class AddNoise(object):
             transformed[mask] = 0.0
         else:
             noise = self.func.sample(shower.shape)*self.noise_width
-            transformed = shower + noise.reshape(shower.shape)
+            transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy
 
 class NormalizeByEinc(object):
@@ -119,7 +119,7 @@ class NormalizeByElayer(object):
                 shower[layer_start:layer_end] = shower[layer_start:layer_end] / (layer_energy + self.eps)
                 layer_energies.append(layer_energy)
         
-            layer_energies_torch = torch.tensor(layer_energies)
+            layer_energies_torch = torch.tensor(layer_energies).to(shower.device)
         
             # Compute the generalized extra dimensions
             extra_dims = [torch.sum(layer_energies_torch, dim=0, keepdim=True) / energy]

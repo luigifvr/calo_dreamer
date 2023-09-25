@@ -190,8 +190,8 @@ class Resnet(nn.Module):
 
         # Embed condition
         if self.conditional:
-            if self.embed_condition:
-                condition = self.embed_c(condition)
+            if self.encode_condition:
+                condition = self.encode_c(condition)
             add_input = torch.cat([t, condition], 1)
         else:
             add_input = t

@@ -44,7 +44,7 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params, device, doc)
+    model = TBD(params, device)
     model.run_training()
 
     #run plotting script

@@ -4,6 +4,7 @@ from scipy.integrate import solve_ivp
 import Networks
 from Util.util import get
 from Models.ModelBase import GenerativeModel
+import Networks
 import Models
 from torchdiffeq import odeint
 from torchsde import sdeint
@@ -63,7 +64,7 @@ class TBD(GenerativeModel):
         x_t, x_t_dot = self.trajectory(x_0, x, t)
 
         self.net.kl = 0
-        drift = self.net(x_t, t, condition)
+        drift = self.net(x_t.float(), t.float(), condition.float())
 
 
         loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
