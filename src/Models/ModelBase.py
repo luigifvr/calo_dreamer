@@ -48,11 +48,12 @@ class GenerativeModel(nn.Module):
                             This is meant to be used during training if intermediate plots are wanted
 
     """
-    def __init__(self, params, device):
+    def __init__(self, params, device, doc):
         """
         :param params: file with all relevant model parameters
         """
         super().__init__()
+        self.doc = doc
         self.params = params
         self.device = device
         self.dim = self.params["dim"]
@@ -108,7 +109,7 @@ class GenerativeModel(nn.Module):
 
         self.log = get(self.params, "log", True)
         if self.log:
-            log_dir = os.path.join(self.params["out_dir"], "logs")
+            log_dir = self.doc.basedir
             self.logger = SummaryWriter(log_dir)
             print(f"train_model: Logging to log_dir {log_dir}")
         else:
@@ -194,7 +195,7 @@ class GenerativeModel(nn.Module):
                     iterations = self.iterations if self.iterate_periodically else 1
                     bay_samples = []
                     for i in range(0, iterations):
-                        sample, c = self.sample_n(self.sample_every_n_samples)
+                        sample, c = self.sample_n()
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
@@ -210,6 +211,9 @@ class GenerativeModel(nn.Module):
                 t1 = time.time()
                 dtEst= (t1-t0) * n_epochs
                 print(f"Training time estimate: {dtEst/60:.2f} min = {dtEst/60**2:.2f} h")
+        # generate and plot samples at the end
+        samples, c = self.sample_n()
+        self.plot_samples(samples=samples, conditions=c)
 
     def train_one_epoch(self):
         # create list to save train_loss
@@ -287,12 +291,12 @@ class GenerativeModel(nn.Module):
 
     def sample_n(self):
         sample = []
-        condition = self.generate_Einc_ds1().to(self.device)
+        condition = torch.tensor(self.generate_Einc_ds1()).to(self.device)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
         condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
 
         for _, batch in enumerate(condition_loader):
-            sample.append(self.sample_batch(batch).detach().cpu().numpy())
+            sample.append(self.sample_batch(batch))
 
         sample = np.concatenate(sample)
         condition = condition.detach().cpu()
@@ -309,12 +313,12 @@ class GenerativeModel(nn.Module):
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True ) # undo preprocessing
         
-        evaluate.main(f"-i {self.params['out_dir']}/samples.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.params['out_dir']}/final/ --cut 0.0".split())
+        evaluate.main(f"-i {self.doc.basedir}/samples.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
 
     def save_sample(self, sample, energies):
         """Save sample in the correct format"""
     
-        save_file = h5py.File(self.params['out_dir']+'samples.hdf5', 'w')
+        save_file = h5py.File(self.doc.get_file('samples.hdf5'), 'w')
         save_file.create_dataset('incident_energies', data=energies)
         save_file.create_dataset('showers', data=sample)
         save_file.close()            

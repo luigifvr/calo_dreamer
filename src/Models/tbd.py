@@ -16,8 +16,8 @@ class TBD(GenerativeModel):
      Inheriting from the GenerativeModel BaseClass
     """
 
-    def __init__(self, params, device):
-        super().__init__(params, device)
+    def __init__(self, params, device, doc):
+        super().__init__(params, device, doc)
         trajectory = get(self.params, "trajectory", "sine_cosine_trajectory")
         try:
             self.trajectory =  getattr(Models.tbd, trajectory)

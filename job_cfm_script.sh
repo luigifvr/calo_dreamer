@@ -4,7 +4,7 @@ POW=$((2**I))
 
 ####Dirs####
 MAINDIR="/remote/gpu06/favaro/calo_dreamer/"
-DATADIR="/remote/gpu06/favaro/calo_inn/datasets/calo_challenge/"
+DATADIR="/remote/gpu06/favaro/datasets/calo_challenge/"
 OUTDIR="/remote/gpu06/favaro/calo_dreamer/results/"
 XMLFILE="${DATADIR}binning_dataset_1_photons.xml"
 
@@ -23,7 +23,7 @@ U0DOWN=0.0
 REW=0.7
 
 ####Training####
-EPS=50
+EPS=1
 CYCLE=50
 SAVE_I=100
 BAYS="False"
@@ -39,7 +39,7 @@ mkdir $ARGSDIR
 
 cat << EOF > $YMLFILE
 run_name: ${RUN_NAME}
-out_dir: ${OUTDIR}${RUN_NAME}
+out_dir: ${OUTDIR}${date}_${RUN_NAME}
 p_type: ${PTYPE}
 dtype: float32
 # Data
@@ -65,15 +65,18 @@ lr: 1.e-5
 max_lr: 1.e-4
 batch_size: ${BATCH_SZ}
 validate_every: 100
-
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-
 weight_decay: ${W_DECAY}
 betas: [0.9, 0.999]
 n_epochs: ${EPS}
 cycle_epochs: ${CYCLE}
 save_interval: ${SAVE_I}
+
+# Sampling
+sample_periodically: True
+sample_every: 100
+sample_every_n_samples: 100
 
 # Architecture
 n_blocks: ${NBLOCKS}
@@ -91,10 +94,11 @@ std_init: -15.0
 
 # ResNet block
 intermediate_dim: 128
-n_blocks: 4
-dim: 368
-n_con: 0
+n_blocks: 1
+dim: 373
+n_con: 1
 layers_per_block: 2
+conditional: True
 
 sub_layers: [linear, linear, linear]
 norm: True

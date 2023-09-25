@@ -432,6 +432,9 @@ def save_hlf(hlf, filename):
 def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
                 transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,):
 
+    print("Dict of preprocessing is: ")
+    print(transforms)
+
     train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
                     val_frac=val_frac, transform=transforms, split='training', device=device)
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
