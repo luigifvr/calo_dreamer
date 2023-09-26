@@ -64,6 +64,7 @@ conditional		| True/False, it should be always True
 An example yaml file is provided in `./configs/cfm_base.yaml`.
 
 Plotting:
+
 To run the sampling and the evaluation of a trained model.
 ```
 python3 src/main.py --use_cuda --plot --model_dir path/to/model --epoch model_name
