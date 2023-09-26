@@ -1,5 +1,6 @@
 /venv/
 /runs/
+/results/
 /.idea
 /params
 .DS_Store
