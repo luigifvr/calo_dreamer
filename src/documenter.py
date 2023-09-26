@@ -18,6 +18,7 @@ class Documenter:
             now = datetime.now()
             while True:
                 full_run_name = now.strftime("%Y%m%d_%H%M%S") + "_" + run_name
+                # Ayo: Update this to use `out_dir` from the yaml config?
                 self.basedir = os.path.join(script_dir, "../results", full_run_name)
                 try:
                     os.mkdir(self.basedir)

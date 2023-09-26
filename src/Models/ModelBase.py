@@ -13,6 +13,7 @@ from Util.util import *
 from data_util import get_loaders
 from transforms import *
 from challenge_files import *
+from challenge_files import evaluate # avoid NameError: 'evaluate' is not defined
 
 class GenerativeModel(nn.Module):
     """
@@ -73,6 +74,7 @@ class GenerativeModel(nn.Module):
         self.validate_every = get(self.params, "validate_every", 50)
 
         #init preprocessing
+        # Ayo: TODO: Add dtype option to avoid placing `.float()` throughout model files.
         self.transforms = get_transformations(params.get('transforms', None))
         self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
                                                                     params.get('particle_type'),
@@ -291,6 +293,7 @@ class GenerativeModel(nn.Module):
 
     def sample_n(self):
         sample = []
+        # Ayo: TODO: generalise condition generation for datasets 2 & 3
         condition = torch.tensor(self.generate_Einc_ds1()).to(self.device)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
         condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
@@ -309,7 +312,7 @@ class GenerativeModel(nn.Module):
 
     def plot_samples(self, samples, conditions, finished=False):
         transforms = self.transforms
-
+        samples = torch.from_numpy(samples) # since transforms expect torch.tensor
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True ) # undo preprocessing
         

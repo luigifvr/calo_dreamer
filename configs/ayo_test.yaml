@@ -49,10 +49,17 @@ bayesian: False
 prior_prec: 5000
 std_init: -15.0
 
+# network: Resnet
+network: SimpleUNet
+# dim: 368
+dim: 373
+
+# U-Net
+hidden_dims: [256, 64]
+
 # ResNet block
 intermediate_dim: 128
 n_blocks: 1
-dim: 368
 n_con: 0
 layers_per_block: 2
 

@@ -48,6 +48,7 @@ def main():
     model.run_training()
 
     #run plotting script
+    # Ayo: TODO: Remove since this already runs during `plot_samples` in `model.run_training`
     evaluate.main(f"-i {doc.basedir}/samples.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
 
 if __name__=='__main__':

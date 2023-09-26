@@ -92,8 +92,8 @@ class TBD(GenerativeModel):
         x_T = torch.randn((batch.shape[0], self.dim), dtype=dtype, device=device)
 
         def f(t, x_t):
-            t_torch = t * torch.ones_like(x_t[:, [0]])
-            v = self.net(x_t, t_torch)
+            t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            v = self.net(x_t.float(), t_torch.float()) # TODO: Avoid .float() by converting in data loaders
 
             return v
 
