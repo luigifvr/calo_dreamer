@@ -178,6 +178,7 @@ class GenerativeModel(nn.Module):
         past_epochs = get(self.params, "total_epochs", 0)
         print(f"train_model: Model has been trained for {past_epochs} epochs before.")
         print(f"train_model: Beginning training. n_epochs set to {n_epochs}")
+        t_0 = time.time()
         for e in range(n_epochs):
             t0 = time.time()
 
@@ -201,7 +202,7 @@ class GenerativeModel(nn.Module):
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
-                    self.plot_samples(samples=samples, conditions=c)
+                    self.plot_samples(samples=samples, conditions=c,name=self.epoch)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -213,8 +214,20 @@ class GenerativeModel(nn.Module):
                 t1 = time.time()
                 dtEst= (t1-t0) * n_epochs
                 print(f"Training time estimate: {dtEst/60:.2f} min = {dtEst/60**2:.2f} h")
+
+        t_1 = time.time()
+        traintime = t_1 - t_0
+        self.params['traintime'] = traintime
+        print(
+            f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.")
         # generate and plot samples at the end
+        print("generate_samples: Start generating samples")
+        t_0 = time.time()
         samples, c = self.sample_n()
+        t_1 = time.time()
+        sampling_time = t_1 - t_0
+        self.params["sampling_time"] = sampling_time
+        print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.")
         self.plot_samples(samples=samples, conditions=c)
 
     def train_one_epoch(self):
@@ -292,6 +305,10 @@ class GenerativeModel(nn.Module):
         return ret
 
     def sample_n(self):
+        if self.net.bayesian:
+            self.net.map = get(self.params, "fix_mu", False)
+            for bay_layer in self.net.bayesian_layers:
+                bay_layer.random = None
         sample = []
         # Ayo: TODO: generalise condition generation for datasets 2 & 3
         condition = torch.tensor(self.generate_Einc_ds1()).to(self.device)
@@ -304,24 +321,24 @@ class GenerativeModel(nn.Module):
         sample = np.concatenate(sample)
         condition = condition.detach().cpu()
 
-        self.save_sample(sample, condition)
+
         return sample, condition
 
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, conditions, finished=False):
+    def plot_samples(self, samples, conditions, name=""):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
         for fn in transforms[::-1]:
-            samples, conditions = fn(samples, conditions, rev=True ) # undo preprocessing
-        
+            samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
+        self.save_sample(samples, conditions, name=name)
         evaluate.main(f"-i {self.doc.basedir}/samples.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
 
-    def save_sample(self, sample, energies):
+    def save_sample(self, sample, energies,name=""):
         """Save sample in the correct format"""
     
-        save_file = h5py.File(self.doc.get_file('samples.hdf5'), 'w')
+        save_file = h5py.File(self.doc.get_file(f'samples{name}.hdf5'), 'w')
         save_file.create_dataset('incident_energies', data=energies)
         save_file.create_dataset('showers', data=sample)
         save_file.close()            

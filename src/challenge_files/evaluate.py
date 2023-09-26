@@ -170,7 +170,7 @@ def prepare_low_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, normed
         E_norm = np.concatenate(E_norm, axis=1)
     voxel, E_inc = extract_shower_and_energy(hdf5_file, label, single_energy=single_energy)
 
-    np.nan_to_num(voxel, copy=False, nan=0.0, posing=0.0, neginf=0.0)
+    np.nan_to_num(voxel, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
     
     voxel[voxel<cut] = 0.0
     if normed:
@@ -178,7 +178,7 @@ def prepare_low_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, normed
         ret = np.concatenate([np.log10(E_inc), voxel, np.log10(E_norm+1e-8),
                               label*np.ones_like(E_inc)], axis=1)
     else:
-        voxel = voxel / E_inc
+        voxel = voxel / E_inc[:,None]
         ret = np.concatenate([np.log10(E_inc), voxel, label*np.ones_like(E_inc)], axis=1)
     return ret
 
@@ -455,7 +455,7 @@ def main(raw_args=None):
                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
     hlf = HLF.HighLevelFeatures(particle,
-                                filename='binning_dataset_{}.xml'.format(
+                                filename='src/challenge_files/binning_dataset_{}.xml'.format(
                                     args.dataset.replace('-', '_')))
     shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
 
@@ -487,7 +487,7 @@ def main(raw_args=None):
     #else:
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='binning_dataset_{}.xml'.format(
+                                              filename='src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
     #save_reference(reference_hlf,

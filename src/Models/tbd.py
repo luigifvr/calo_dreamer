@@ -81,11 +81,7 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        if self.net.bayesian:
-            self.net.map = get(self.params, "fix_mu", False)
-            for bay_layer in self.net.bayesian_layers:
-                bay_layer.random = None
-
+        batch = batch[:, None]
         dtype = batch.dtype
         device = batch.device
 
@@ -93,7 +89,7 @@ class TBD(GenerativeModel):
 
         def f(t, x_t):
             t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
-            v = self.net(x_t.float(), t_torch.float()) # TODO: Avoid .float() by converting in data loaders
+            v = self.net(x_t.float(), t_torch.float(), batch.float()) # TODO: Avoid .float() by converting in data loaders
 
             return v
 
