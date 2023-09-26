@@ -207,7 +207,7 @@ class GenerativeModel(nn.Module):
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
                 if (self.epoch + 1) % get(self.params,"save_every",10) == 0 or self.epoch==0:
-                    torch.save(self.state_dict(), f"models/model_epoch_{e+1}.pt")
+                    self.save(epoch=f"self.epoch")
 
             # estimate training time
             if e==0:
@@ -220,6 +220,10 @@ class GenerativeModel(nn.Module):
         self.params['traintime'] = traintime
         print(
             f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.")
+        
+        #save final model
+        print("train_model: Saving final model: ")
+        self.save()
         # generate and plot samples at the end
         print("generate_samples: Start generating samples")
         t_0 = time.time()
@@ -333,7 +337,7 @@ class GenerativeModel(nn.Module):
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
         self.save_sample(samples, conditions, name=name)
-        evaluate.main(f"-i {self.doc.basedir}/samples.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
+        evaluate.main(f"-i {self.doc.basedir}/samples{name}.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
 
     def save_sample(self, sample, energies,name=""):
         """Save sample in the correct format"""
@@ -343,4 +347,24 @@ class GenerativeModel(nn.Module):
         save_file.create_dataset('showers', data=sample)
         save_file.close()            
  
+    def save(self, epoch=""):
+        """ Save the model, and more if needed"""
+        torch.save({#"opt": self.optim.state_dict(),
+                    "net": self.net.state_dict(),
+                    #"losses": self.losses_test,
+                    #"learning_rates": self.learning_rates,
+                    }#"epoch": self.epoch}
+                    , self.doc.get_file(f"model{epoch}.pt"))
+
+    def load(self, epoch=""):
+        """ Load the model, and more if needed"""
+        name = self.doc.get_file(f"model{epoch}.pt")
+        state_dicts = torch.load(name, map_location=self.device)
+        self.net.load_state_dict(state_dicts["net"])
+
+        #self.losses_test = state_dicts.get("losses", {})
+        #self.learning_rates = state_dicts.get("learning_rates", [])
+        #self.epoch = state_dicts.get("epoch", 0)
+        #self.optim.load_state_dict(state_dicts["opt"])
+        self.net.to(self.device)
 

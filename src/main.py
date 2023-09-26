@@ -15,7 +15,7 @@ def main():
     parser.add_argument('-c', '--use_cuda', action='store_true', default=False,)
     parser.add_argument('-p', '--plot', action='store_true', default=False,)
     parser.add_argument('-d', '--model_dir', default=None,)
-    parser.add_argument('-its', '--model_name')
+    parser.add_argument('-ep', '--epoch')
 
     args = parser.parse_args()
 
@@ -45,11 +45,15 @@ def main():
         torch.set_default_dtype(torch.float32)
 
     model = TBD(params, device, doc)
-    model.run_training()
-
-    #run plotting script
-    # Ayo: TODO: Remove since this already runs during `plot_samples` in `model.run_training`
-    evaluate.main(f"-i {doc.basedir}/samples.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
+    if not args.plot:
+        model.run_training()
+    else:
+        model.load(args.epoch)
+        x, c = model.sample_n()
+        model.plot_samples(x, c, name=f"{args.epoch}")
+        #run plotting script
+        # Ayo: TODO: Remove since this already runs during `plot_samples` in `model.run_training`
+        evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
 
 if __name__=='__main__':
     main()

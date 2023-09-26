@@ -1,8 +1,8 @@
 #!/bin/bash
-#PBS -N det_inn_8
+#PBS -N test_calo_dreamer
 #PBS -l walltime=40:00:00
-#PBS -l nodes=1:ppn=1:gpus=1:a30
-#PBS -q a30
+#PBS -l nodes=1:ppn=1:gpus=1:gshort
+#PBS -q gshort
 
 module load cuda/11.4
 source activate /remote/gpu06/favaro/.conda/pytorch

@@ -1,22 +1,16 @@
 run_name: test_calo_dreamer
-out_dir: /remote/gpu06/favaro/calo_dreamer/results/test_calo_dreamer
 p_type: photon
 dtype: float32
 # Data
-hdf5_file: /remote/gpu06/favaro/calo_inn/datasets/calo_challenge/gamma_data_1.hdf5
-xml_filename: /remote/gpu06/favaro/calo_inn/datasets/calo_challenge/binning_dataset_1_photons.xml
-single_energy: null
+hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/gamma_data_1.hdf5
+xml_filename: /remote/gpu06/favaro/datasets/calo_challenge/binning_dataset_1_photons.xml
 width_noise: 5.0e-6
-custom_noise: False
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: "photon"
 eval_dataset: "1-photons"
-u0up_cut: 3.0
-u0low_cut: 0.0
-pt_rew: 0.7
 transforms: {
- NormalizeByElayer: {ptype: /remote/gpu06/favaro/calo_inn/datasets/calo_challenge/binning_dataset_1_photons.xml, xml_file: photon},
+ NormalizeByElayer: {ptype: /remote/gpu06/favaro/datasets/calo_challenge/binning_dataset_1_photons.xml, xml_file: photon},
  AddNoise: {noise_width: 5.0e-6}
 }
 
@@ -25,42 +19,27 @@ lr: 1.e-5
 max_lr: 1.e-4
 batch_size: 256
 validate_every: 100
-
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-
 weight_decay: 0.01
 betas: [0.9, 0.999]
-n_epochs: 50
+n_epochs: 1
 cycle_epochs: 50
 save_interval: 100
 
-# Architecture
-n_blocks: 12
-internal_size: 256
-layers_per_block: 3
-coupling_type: cubic
-bounds_init: 15
-permute_soft: False
-permute_layer: False
-num_bins: 10
-dropout: 0.0
-bayesian: False
-prior_prec: 5000
-std_init: -15.0
+# Sampling
+sample_periodically: True
+sample_every: 100
+sample_every_n_samples: 100
 
 # ResNet block
-intermediate_dim: 128
-n_blocks: 4
-dim: 368
-n_con: 0
-layers_per_block: 2
+intermediate_dim: 256
+n_blocks: 1
+dim: 373
+n_con: 1
+layers_per_block: 3
+conditional: True
 
-sub_layers: [linear, linear, linear]
-norm: True
-# Preprocessing
-use_extra_dims: True
-use_norm: False
-log_cond: True
+# Additional params
 alpha: 1.0e-8
 alpha_logit: 1.0e-6

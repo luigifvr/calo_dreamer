@@ -459,11 +459,15 @@ def main(raw_args=None):
                                     args.dataset.replace('-', '_')))
     shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
 
-    #Checking nans and setting to 0
-    print("Checking for nans in the generated sample, number of nans: \n")
-    print(np.isnan(shower).sum())
+    #Checking for negative values, nans and infinities
+    print("Checking for negative values, number of negative energies: ")
+    print("input: ", (shower < 0.0).sum(), "\n")
+    print("Checking for nans in the generated sample, number of nans: ")
+    print("input: ", np.isnan(shower).sum(), "\n")
+    print("Checking for infs in the generated sample, number of infs: ")
+    print("input: ", np.isinf(shower).sum(),"\n")
     np.nan_to_num(shower, copy=False, nan=0.0, neginf=0.0, posinf=0.0)
-
+ 
     # Using a cut everywhere
     print("Using Everywhere a cut of {}".format(args.cut))
     shower[shower<args.cut] = 0.0
