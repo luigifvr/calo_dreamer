@@ -35,4 +35,7 @@ class CaloChallengeDataset(Dataset):
         if self.transform:
             for fn in self.transform:
                 showers, energies = fn(showers, energies)
+
+        # Apply log-condition
+        energies = torch.log10(energies/1e3)
         return showers, energies
