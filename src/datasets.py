@@ -37,5 +37,5 @@ class CaloChallengeDataset(Dataset):
                 showers, energies = fn(showers, energies)
 
         # Apply log-condition
-        energies = np.log10(energies/1e3)
+        energies = torch.log10(energies/1e3)
         return showers, energies
