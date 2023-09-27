@@ -307,7 +307,7 @@ class GenerativeModel(nn.Module):
         if energy is not None:
             ret = ret[ret == energy]
         np.random.shuffle(ret)
-        return np.log10(ret/1000)
+        return ret
 
     def sample_n(self):
         if self.net.bayesian:
@@ -317,6 +317,8 @@ class GenerativeModel(nn.Module):
         sample = []
         # Ayo: TODO: generalise condition generation for datasets 2 & 3
         condition = torch.tensor(self.generate_Einc_ds1()).to(self.device)
+        # log-condition
+        condition = torch.log(condition/1e3)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
         condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
 
@@ -335,6 +337,7 @@ class GenerativeModel(nn.Module):
     def plot_samples(self, samples, conditions, name=""):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
+        conditions = torch.exp(conditions)*1e3  # revert log-cond
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
         self.save_sample(samples, conditions, name=name)
