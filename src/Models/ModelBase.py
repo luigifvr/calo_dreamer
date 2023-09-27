@@ -7,6 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from matplotlib.backends.backend_pdf import PdfPages
 import os
+import sys
 
 # Other functions of project
 from Util.util import *
@@ -202,7 +203,7 @@ class GenerativeModel(nn.Module):
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
-                    self.plot_samples(samples=samples, conditions=c,name=self.epoch)
+                    self.plot_samples(samples=samples, conditions=c.reshape(-1, 1),name=self.epoch)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -214,25 +215,25 @@ class GenerativeModel(nn.Module):
                 t1 = time.time()
                 dtEst= (t1-t0) * n_epochs
                 print(f"Training time estimate: {dtEst/60:.2f} min = {dtEst/60**2:.2f} h")
-
+            sys.stdout.flush()
         t_1 = time.time()
         traintime = t_1 - t_0
         self.params['traintime'] = traintime
         print(
-            f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.")
+            f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.", flush=True)
         
         #save final model
-        print("train_model: Saving final model: ")
+        print("train_model: Saving final model: ", flush=True)
         self.save()
         # generate and plot samples at the end
-        print("generate_samples: Start generating samples")
+        print("generate_samples: Start generating samples", flush=True)
         t_0 = time.time()
         samples, c = self.sample_n()
         t_1 = time.time()
         sampling_time = t_1 - t_0
         self.params["sampling_time"] = sampling_time
-        print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.")
-        self.plot_samples(samples=samples, conditions=c)
+        print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
+        self.plot_samples(samples=samples, conditions=c.reshape(-1, 1))
 
     def train_one_epoch(self):
         # create list to save train_loss
