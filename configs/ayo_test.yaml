@@ -1,20 +1,14 @@
-run_name: test_calo_dreamer
-out_dir: /data/projects/punim0011/aore/CaloChallenge/test
+run_name: resnet_10_epochs
 p_type: photon
 dtype: float32
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_1.hdf5
 xml_filename: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml
-single_energy: null
 width_noise: 5.0e-6
-custom_noise: False
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: "photon"
 eval_dataset: "1-photons"
-u0up_cut: 3.0
-u0low_cut: 0.0
-pt_rew: 0.7
 transforms: {
  NormalizeByElayer: {ptype: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
  AddNoise: {noise_width: 5.0e-6}
@@ -25,46 +19,38 @@ lr: 1.e-5
 max_lr: 1.e-4
 batch_size: 256
 validate_every: 100
-
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-
 weight_decay: 0.01
 betas: [0.9, 0.999]
-n_epochs: 1
-cycle_epochs: 50
+n_epochs: 10
+cycle_epochs: 10
 save_interval: 100
 
-# Architecture
-n_blocks: 1
-internal_size: 128
-layers_per_block: 2
-coupling_type: cubic
-bounds_init: 15
-permute_soft: False
-permute_layer: False
-num_bins: 10
-dropout: 0.0
-bayesian: False
-prior_prec: 5000
-std_init: -15.0
+# Sampling
+sample_periodically: False
+sample_every: 100
+sample_every_n_samples: 100
 
-# network: Resnet
-network: SimpleUNet
+network: Resnet
+# network: SimpleUNet
 # dim: 368
 dim: 373
 
-# U-Net
-hidden_dims: [256, 64]
-
 # ResNet block
-intermediate_dim: 128
+intermediate_dim: 256
 n_blocks: 1
-n_con: 0
-layers_per_block: 2
+n_con: 1
+layers_per_block: 3
+conditional: True
 
-sub_layers: [linear, linear, linear]
-norm: True
+# U-Net
+hidden_dims: [256, 128, 64]
+condition_dim: 1
+encode_t: True
+encode_t_dim: 16
+encode_c: True
+encode_c_dim: 16
 
 # Preprocessing
 use_extra_dims: True

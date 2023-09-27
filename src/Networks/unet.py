@@ -40,14 +40,15 @@ class SimpleUNet(nn.Module):
         
         assert all((d < self.dim for d in self.hidden_dims)), \
         'Hidden dimensions must be smaller than the data dimension.'
-                
+
         self.build_layers()
     
     def build_layers(self):
         # TODO: implement Bayesian layer
 
         # organise dimensions
-        level_dims = sorted([self.dim] + self.hidden_dims, reverse=True)
+        self.hidden_dims.sort(reverse=True)
+        level_dims = [self.dim] + self.hidden_dims
         extra_dims = (self.encode_t_dim if self.encode_t else 1) \
                  + (self.encode_c_dim if self.encode_c else self.condition_dim)
         
@@ -61,6 +62,10 @@ class SimpleUNet(nn.Module):
         self.decoding_layers = nn.ModuleList(decoding_layers)
 
         # TODO: Add normalisation layers
+        self.layer_norms = nn.ModuleList([
+            nn.LayerNorm(d+extra_dims)
+            for d in level_dims[:-1] + level_dims[len(level_dims):0:-1]
+        ])
 
         # construct condition encodings
         if self.encode_t:
@@ -84,14 +89,18 @@ class SimpleUNet(nn.Module):
 
         residuals = []
         # encode
-        for layer in self.encoding_layers:
+        for i, layer in enumerate(self.encoding_layers):
             residuals.append(x)
             x = torch.cat([x, condition], 1)
+            x = self.layer_norms[i](x)
             x = layer(x)
+            
             x = self.activation(x)
+
         # decode
         for i, layer in enumerate(self.decoding_layers):
             x = torch.cat([x, condition], 1)
+            x = self.layer_norms[i+len(self.hidden_dims)](x)
             x = layer(x)
             x += residuals.pop()
             if i+1 < len(self.hidden_dims):
