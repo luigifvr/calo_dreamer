@@ -306,7 +306,7 @@ class GenerativeModel(nn.Module):
         if energy is not None:
             ret = ret[ret == energy]
         np.random.shuffle(ret)
-        return ret
+        return np.log10(ret/1000)
 
     def sample_n(self):
         if self.net.bayesian:
