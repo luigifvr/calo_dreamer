@@ -62,17 +62,15 @@ class TBD(GenerativeModel):
         t = torch.distributions.uniform.Uniform(low=0, high=1).sample((x.size(0),1)).to(x.device)
         x_0 = torch.randn_like(x)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
-
         self.net.kl = 0
-        drift = self.net(x_t.float(), t.float(), condition.float())
-
+        drift = self.net(x_t, t, condition)
 
         loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
-        self.regular_loss.append(loss.detach().cpu().numpy())
-        if self.C != 0:
-            kl_loss = self.C*self.net.kl / self.n_traindata
-            self.kl_loss.append(kl_loss.detach().cpu().numpy())
-            loss = loss + kl_loss
+        # self.regular_loss.append(loss.detach().cpu().numpy())
+        # if self.C != 0:
+            # kl_loss = self.C*self.net.kl / self.n_traindata
+            # self.kl_loss.append(kl_loss.detach().cpu().numpy())
+            # loss = loss + kl_loss
 
         return loss
 
@@ -89,7 +87,7 @@ class TBD(GenerativeModel):
 
         def f(t, x_t):
             t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
-            v = self.net(x_t.float(), t_torch.float(), batch.float()) # TODO: Avoid .float() by converting in data loaders
+            v = self.net(x_t, t_torch, batch)
 
             return v
 

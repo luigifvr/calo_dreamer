@@ -441,7 +441,8 @@ def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
                     val_frac=val_frac, transform=transforms, split='validation', device=device)
 
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
-    val_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
+
     return train_dataloader, val_dataloader, train_dataset.layer_boundaries
 
 """

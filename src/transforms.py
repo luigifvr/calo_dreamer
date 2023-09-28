@@ -15,9 +15,9 @@ class Standardize(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = shower*stds + means
+            transformed = shower*self.stds + self.means
         else:
-            transformed = (shower - means)/stds
+            transformed = (shower - self.means)/self.stds
         return transformed, energy
 
 class LogTransform(object):

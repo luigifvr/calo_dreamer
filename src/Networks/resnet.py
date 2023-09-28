@@ -186,8 +186,6 @@ class Resnet(nn.Module):
             if self.param.get("encode_t_type", "Gauss") == "Embedding":
                 t = torch.squeeze(t)
 
-        t = t.float()
-
         # Embed condition
         if self.conditional:
             if self.encode_condition:
