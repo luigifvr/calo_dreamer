@@ -316,7 +316,8 @@ class GenerativeModel(nn.Module):
                 bay_layer.random = None
         sample = []
         # Ayo: TODO: generalise condition generation for datasets 2 & 3
-        condition = torch.tensor(self.generate_Einc_ds1()).to(self.device)
+        condition = torch.tensor(self.generate_Einc_ds1(), dtype=torch.get_default_dtype()).to(self.device)
+        
         # log-condition
         condition = torch.log(condition/1e3)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
@@ -328,7 +329,7 @@ class GenerativeModel(nn.Module):
         sample = np.concatenate(sample)
         condition = condition.detach().cpu()
 
-
+        # should condition be exponentiated?
         return sample, condition
 
     def sample_batch(self, batch):
