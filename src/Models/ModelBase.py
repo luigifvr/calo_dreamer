@@ -60,6 +60,7 @@ class GenerativeModel(nn.Module):
         self.device = device
         self.dim = self.params["dim"]
         self.conditional = get(self.params,'conditional',False)
+        self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
 
         self.batch_size = self.params["batch_size"]
         self.batch_size_sample = get(self.params, "batch_size_sample", self.batch_size)
@@ -86,7 +87,8 @@ class GenerativeModel(nn.Module):
                                                                     params.get('eps', 1.e-10),
                                                                     device=device,
                                                                     shuffle=True,
-                                                                    width_noise=params.get('width_noise', 1.e-6))
+                                                                    width_noise=params.get('width_noise', 1.e-6),
+                                                                    single_energy=params.get('single_energy', None))
 
     def build_net(self):
         pass
@@ -317,7 +319,7 @@ class GenerativeModel(nn.Module):
                 bay_layer.random = None
         sample = []
         # Ayo: TODO: generalise condition generation for datasets 2 & 3
-        condition = torch.tensor(self.generate_Einc_ds1(), dtype=torch.get_default_dtype()).to(self.device)
+        condition = torch.tensor(self.generate_Einc_ds1(energy=self.single_energy), dtype=torch.get_default_dtype()).to(self.device)
         
         # log-condition
         condition = torch.log(condition/1e3)

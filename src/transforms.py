@@ -43,16 +43,18 @@ class AddNoise(object):
         func: torch distribution used to sample from
         width_noise: noise rescaling
     """
-    def __init__(self, noise_width):
+    def __init__(self, noise_width, cut=False):
         #self.func = func
         self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
         self.noise_width = noise_width
-    
+        self.cut = cut # apply cut if True
+
     def __call__(self, shower, energy, rev=False):
         if rev:
             mask = (shower < self.noise_width)
             transformed = shower
-            transformed[mask] = 0.0
+            if self.cut:
+                transformed[mask] = 0.0 
         else:
             noise = self.func.sample(shower.shape)*self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)

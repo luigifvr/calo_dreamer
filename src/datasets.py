@@ -9,7 +9,7 @@ from transforms import *
 class CaloChallengeDataset(Dataset):
     """ Dataset for CaloChallenge showers """
     def __init__(self, hdf5_file, particle_type, xml_filename, val_frac=0.3, 
-            transform=None, split='training', device='cpu'):
+            transform=None, split='training', device='cpu', single_energy=None):
         """
         Arguments:
             hdf5_file: path to hdf5 file
@@ -18,7 +18,7 @@ class CaloChallengeDataset(Dataset):
             transform: list of transformations
         """
         
-        self.data, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename)
+        self.data, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
         self.energy, self.layers = get_energy_and_sorted_layers(self.data)
         del self.data
         
