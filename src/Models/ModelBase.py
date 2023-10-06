@@ -226,14 +226,15 @@ class GenerativeModel(nn.Module):
         print("train_model: Saving final model: ", flush=True)
         self.save()
         # generate and plot samples at the end
-        print("generate_samples: Start generating samples", flush=True)
-        t_0 = time.time()
-        samples, c = self.sample_n()
-        t_1 = time.time()
-        sampling_time = t_1 - t_0
-        self.params["sampling_time"] = sampling_time
-        print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
-        self.plot_samples(samples=samples, conditions=c.reshape(-1, 1))
+        if get(self.params, "sample", True):
+            print("generate_samples: Start generating samples", flush=True)
+            t_0 = time.time()
+            samples, c = self.sample_n()
+            t_1 = time.time()
+            sampling_time = t_1 - t_0
+            self.params["sampling_time"] = sampling_time
+            print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
+            self.plot_samples(samples=samples, conditions=c.reshape(-1, 1))
 
     def train_one_epoch(self):
         # create list to save train_loss

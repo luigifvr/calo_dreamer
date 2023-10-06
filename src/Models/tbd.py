@@ -18,7 +18,7 @@ class TBD(GenerativeModel):
 
     def __init__(self, params, device, doc):
         super().__init__(params, device, doc)
-        trajectory = get(self.params, "trajectory", "sine_cosine_trajectory")
+        trajectory = get(self.params, "trajectory", "linear_trajectory")
         try:
             self.trajectory =  getattr(Models.tbd, trajectory)
         except AttributeError:
@@ -30,6 +30,7 @@ class TBD(GenerativeModel):
             print(f"C is {self.C}")
 
         self.bayesian = get(self.params, "bayesian", 0)
+        self.distribution = torch.distributions.uniform.Uniform(low=0, high=1)
 
 
     def build_net(self):
@@ -58,8 +59,8 @@ class TBD(GenerativeModel):
         """
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
-
-        t = torch.distributions.uniform.Uniform(low=0, high=1).sample((x.size(0),1)).to(x.device)
+        #x = x[:,:10]
+        t = self.distribution.sample((x.size(0),1)).to(x.device)
         x_0 = torch.randn_like(x)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
