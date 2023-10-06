@@ -76,7 +76,6 @@ class GenerativeModel(nn.Module):
         self.validate_every = get(self.params, "validate_every", 50)
 
         #init preprocessing
-        # Ayo: TODO: Add dtype option to avoid placing `.float()` throughout model files.
         self.transforms = get_transformations(params.get('transforms', None))
         self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
                                                                     params.get('particle_type'),
