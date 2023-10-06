@@ -25,6 +25,7 @@ class CaloChallengeDataset(Dataset):
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
         self.transform = transform
         self.device = device
+        self.energy, self.layers = torch.tensor(self.energy).to(device=self.device), torch.tensor(self.layers).to(device=self.device)
         self.dtype = torch.get_default_dtype()
 
     def __len__(self):
@@ -34,8 +35,12 @@ class CaloChallengeDataset(Dataset):
         # clone unnecessary if data is initially a numpy array
         # showers = torch.clone(torch.tensor(self.layers[idx]).to(device=self.device))
         # energies = torch.clone(torch.tensor(self.energy[idx]).to(device=self.device))
-        showers = torch.tensor(self.layers[idx]).to(device=self.device)
-        energies = torch.tensor(self.energy[idx]).to(device=self.device)
+        
+        # Testing loading everything on GPU
+        #showers = torch.tensor(self.layers[idx]).to(device=self.device)
+        #energies = torch.tensor(self.energy[idx]).to(device=self.device)
+        showers = self.layers[idx]
+        energies = self.energy[idx]
 
         if self.transform:
             for fn in self.transform:

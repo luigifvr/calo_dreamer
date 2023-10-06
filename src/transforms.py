@@ -2,6 +2,7 @@ import torch
 import numpy as np
 
 from challenge_files import *
+from challenge_files import XMLHandler
 
 class Standardize(object):
     """
@@ -87,16 +88,17 @@ class NormalizeByElayer(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            shower = shower.to(torch.float64)
+            # Testing no casting to float64
+            #shower = shower.to(torch.float64)
 
             extra_dims = shower[..., -self.number_of_layers:]
             extra_dims[:, (-self.number_of_layers+1):] = torch.clip(extra_dims[:, (-self.number_of_layers+1):], min=torch.tensor(0.), max=torch.tensor(1.))   #clipping 
             shower = shower[:, :-self.number_of_layers]
-            transformed = torch.zeros_like(shower, dtype=torch.float64)
+            transformed = torch.zeros_like(shower)
 
             layer_energies = []
             en_tot = torch.multiply(energy.flatten(), extra_dims[:,0])
-            cum_sum = torch.zeros_like(en_tot, dtype=torch.float64)
+            cum_sum = torch.zeros_like(en_tot)
             for i in range(extra_dims.shape[-1]-1):
                 ens = (en_tot - cum_sum)*extra_dims[:,i+1]
                 layer_energies.append(ens)
@@ -110,8 +112,9 @@ class NormalizeByElayer(object):
                                              (torch.sum(shower[..., layer_start:layer_end], axis=1, keepdims=True) + self.eps)
 
         else:
-            shower = torch.clone(shower.to(torch.float64))
-            energy = torch.clone(energy.to(torch.float64))
+            #Testing no casting to float 64
+            #shower = torch.clone(shower.to(torch.float64))
+            #energy = torch.clone(energy.to(torch.float64))
 
             #calculate extra dimensions
             layer_energies = []
