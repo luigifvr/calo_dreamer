@@ -6,3 +6,5 @@
 .DS_Store
 *.ipynb
 **__pycache__
+*.xml
+*.hdf5
