@@ -71,7 +71,7 @@ class SimpleUNet(nn.Module):
         if self.encode_t:
             self.t_encoding = nn.Linear(1, self.encode_t_dim)
         if self.encode_c:
-            self.c_encoding = nn.Linear(self.condition_dim, self.encode_t_dim)
+            self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
 
     def forward(self, x, t, c=None):
 

@@ -1,4 +1,4 @@
-run_name: resnet_10_epochs
+run_name: resnet_50_epochs
 p_type: photon
 dtype: float32
 # Data
@@ -10,8 +10,10 @@ eps: 1.0e-10
 particle_type: "photon"
 eval_dataset: "1-photons"
 transforms: {
- NormalizeByElayer: {ptype: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
- AddNoise: {noise_width: 5.0e-6}
+  NormalizeByElayer: {ptype: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
+  AddNoise: {noise_width: 5.0e-6},
+  LogTransform: {alpha: 1.0e-6},
+  Standardize: {means: -6.0, stds: 4.0}
 }
 
 # Training
@@ -23,8 +25,8 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.01
 betas: [0.9, 0.999]
-n_epochs: 10
-cycle_epochs: 10
+n_epochs: 50
+cycle_epochs: 50
 save_interval: 100
 
 # Sampling
