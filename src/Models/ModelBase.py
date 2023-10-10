@@ -321,18 +321,13 @@ class GenerativeModel(nn.Module):
         condition = torch.tensor(self.generate_Einc_ds1(energy=self.single_energy), dtype=torch.get_default_dtype()).to(self.device)
         
         # log-condition
-        condition = torch.log(condition/1e3)
+        log_condition = torch.log(condition/1e3)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
-        condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
+        log_condition_loader = DataLoader(dataset=log_condition, batch_size=batch_size_sample, shuffle=False)
 
-        for _, batch in enumerate(condition_loader):
-            sample.append(self.sample_batch(batch))
+        sample = np.vstack([self.sample_batch(c) for c in log_condition_loader])
 
-        sample = np.concatenate(sample)
-        condition = condition.detach().cpu()
-
-        # should condition be exponentiated?
-        return sample, condition
+        return sample, condition.detach().cpu()
 
     def sample_batch(self, batch):
         pass
@@ -340,13 +335,12 @@ class GenerativeModel(nn.Module):
     def plot_samples(self, samples, conditions, name=""):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
-        conditions = torch.exp(conditions)*1e3  # revert log-cond
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
         self.save_sample(samples, conditions, name=name)
         evaluate.main(f"-i {self.doc.basedir}/samples{name}.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
 
-    def save_sample(self, sample, energies,name=""):
+    def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
     
         save_file = h5py.File(self.doc.get_file(f'samples{name}.hdf5'), 'w')
