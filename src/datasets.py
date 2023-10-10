@@ -18,6 +18,7 @@ class CaloChallengeDataset(Dataset):
             transform: list of transformations
         """
         
+        # TODO: Use `val_frac` argument to select subset of data according to `split`
         self.data, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
         self.energy, self.layers = get_energy_and_sorted_layers(self.data)
         del self.data
@@ -25,16 +26,20 @@ class CaloChallengeDataset(Dataset):
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
         self.transform = transform
         self.device = device
-        self.energy, self.layers = torch.tensor(self.energy).to(device=self.device), torch.tensor(self.layers).to(device=self.device)
         self.dtype = torch.get_default_dtype()
+        self.energy = torch.tensor(self.energy, dtype=self.dtype).to(device=self.device)
+        self.layers = torch.tensor(self.layers, dtype=self.dtype).to(device=self.device)
 
+        # apply preprocessing
+        if self.transform:
+            for fn in self.transform:
+                self.layers, self.energy = fn(self.layers, self.energy)
+        self.energy = torch.log(self.energy/1e3)
+        
     def __len__(self):
         return len(self.energy)
 
     def __getitem__(self, idx):
-        # clone unnecessary if data is initially a numpy array
-        # showers = torch.clone(torch.tensor(self.layers[idx]).to(device=self.device))
-        # energies = torch.clone(torch.tensor(self.energy[idx]).to(device=self.device))
         
         # Testing loading everything on GPU
         #showers = torch.tensor(self.layers[idx]).to(device=self.device)
@@ -42,11 +47,4 @@ class CaloChallengeDataset(Dataset):
         showers = self.layers[idx]
         energies = self.energy[idx]
 
-        if self.transform:
-            for fn in self.transform:
-                showers, energies = fn(showers, energies)
-
-        # Apply log-condition
-        energies = torch.log(energies/1e3)
-
-        return showers.to(self.dtype), energies.to(self.dtype)
+        return showers, energies
