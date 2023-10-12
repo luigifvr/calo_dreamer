@@ -61,6 +61,28 @@ class AddNoise(object):
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy
 
+class AddPowerlawNoise(object):
+    """
+    Add noise to input data following a power law distribution:
+        eps ~ k x^(k-1)
+        k   -- The power parameter of the distribution
+        cut -- The value below which voxels will be masked to zero in the reverse transformation
+    """
+    def __init__(self, k, cut=None):
+        self.k = k
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.cut)
+            transformed = shower
+            if self.cut is not None:
+                transformed[mask] = 0.0
+        else:
+            noise = torch.from_numpy(np.random.power(self.k, shower.shape)).to(shower.dtype)
+            transformed = shower + noise.reshape(shower.shape).to(shower.device)
+        return transformed, energy
+
 class NormalizeByEinc(object):
     """
     Normalize each shower by the incident energy
@@ -112,33 +134,29 @@ class NormalizeByElayer(object):
                                              (torch.sum(shower[..., layer_start:layer_end], axis=1, keepdims=True) + self.eps)
 
         else:
-            #Testing no casting to float 64
-            #shower = torch.clone(shower.to(torch.float64))
-            #energy = torch.clone(energy.to(torch.float64))
-
             #calculate extra dimensions
             layer_energies = []
              
             for layer_start, layer_end in zip(self.layer_boundaries[:-1], self.layer_boundaries[1:]):
-                layer_energy = torch.sum(shower[layer_start:layer_end], dim=0, keepdim=True)
-                shower[layer_start:layer_end] = shower[layer_start:layer_end] / (layer_energy + self.eps)
+                layer_energy = torch.sum(shower[:, layer_start:layer_end], dim=1, keepdim=True)
+
+                shower[:, layer_start:layer_end] = shower[:, layer_start:layer_end] / (layer_energy + self.eps)
                 layer_energies.append(layer_energy)
         
-            layer_energies_torch = torch.tensor(layer_energies).to(shower.device)
-        
+            layer_energies_torch = torch.cat(layer_energies, dim=1).to(shower.device)
+
             # Compute the generalized extra dimensions
-            extra_dims = [torch.sum(layer_energies_torch, dim=0, keepdim=True) / energy]
+            extra_dims = [torch.sum(layer_energies_torch, dim=1, keepdim=True) / energy]
 
             for layer_index in range(len(self.layer_boundaries)-2):
-                extra_dim = layer_energies_torch[..., [layer_index]] / (torch.sum(layer_energies_torch[layer_index:], dim=0, keepdim=True) + self.eps)
+                extra_dim = layer_energies_torch[..., [layer_index]] / (torch.sum(layer_energies_torch[:, layer_index:], dim=1, keepdim=True) + self.eps)
                 extra_dims.append(extra_dim)
         
-            extra_dims = torch.cat(extra_dims, dim=0)
+            extra_dims = torch.cat(extra_dims, dim=1)
             # normalize by E_layer
             for layer_index, (layer_start, layer_end) in enumerate(zip(self.layer_boundaries[:-1], self.layer_boundaries[1:])):
-                shower[layer_start:layer_end] = shower[layer_start:layer_end] / ( torch.sum(shower[layer_start:layer_end], dim=0, keepdim=True) + self.eps)
+                shower[:, layer_start:layer_end] = shower[:, layer_start:layer_end] / ( torch.sum(shower[:, layer_start:layer_end], dim=1, keepdim=True) + self.eps)
 
-            transformed = torch.cat((shower, extra_dims), dim=0)
+            transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
-        
