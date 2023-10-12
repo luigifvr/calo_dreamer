@@ -19,9 +19,9 @@ class CaloChallengeDataset(Dataset):
         """
         
         # TODO: Use `val_frac` argument to select subset of data according to `split`
-        self.data, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
-        self.energy, self.layers = get_energy_and_sorted_layers(self.data)
-        del self.data
+        self.voxels, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
+        self.energy, self.layers = get_energy_and_sorted_layers(self.voxels)
+        del self.voxels
         
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
         self.transform = transform
@@ -35,16 +35,23 @@ class CaloChallengeDataset(Dataset):
             for fn in self.transform:
                 self.layers, self.energy = fn(self.layers, self.energy)
         self.energy = torch.log(self.energy/1e3)
+
+        # make train/val split
+        val_size = int(len(self.energy)*val_frac)
+        trn_size = len(self.energy) - val_size
+        self.data = torch.utils.data.random_split(
+            torch.utils.data.TensorDataset(self.layers, self.energy),
+            [trn_size, val_size]
+        )[0 if split=='training' else 1 if split=='validation' else None]
         
     def __len__(self):
-        return len(self.energy)
+        return len(self.data)
 
     def __getitem__(self, idx):
         
         # Testing loading everything on GPU
         #showers = torch.tensor(self.layers[idx]).to(device=self.device)
         #energies = torch.tensor(self.energy[idx]).to(device=self.device)
-        showers = self.layers[idx]
-        energies = self.energy[idx]
-
-        return showers, energies
+        # showers = self.layers[idx]
+        # energies = self.energy[idx]
+        return self.data[idx]
