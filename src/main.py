@@ -50,7 +50,7 @@ def main():
     else:
         model.load(args.epoch)
         x, c = model.sample_n()
-        model.plot_samples(x, c, name=f"{args.epoch}")
+        model.plot_samples(x, c.reshape(-1, 1), name=f"{args.epoch}")
         #run plotting script
         evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
 
