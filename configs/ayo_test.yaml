@@ -1,38 +1,43 @@
-run_name: resnet_50_epochs
+# run_name: large_tbd_test
+run_name: cfm_5000_epochs_nolog_5_4_3_2_1_layernorm
 p_type: photon
 dtype: float32
+
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_1.hdf5
-xml_filename: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml
 width_noise: 5.0e-6
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: "photon"
 eval_dataset: "1-photons"
+# single_energy: 262144.0
 transforms: {
-  NormalizeByElayer: {ptype: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
-  AddNoise: {noise_width: 5.0e-6},
-  LogTransform: {alpha: 1.0e-6},
-  Standardize: {means: -6.0, stds: 4.0}
+  NormalizeByElayer: {ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
+  AddNoise: {noise_width: 5.e-6},
+  # AddPowerlawNoise: {k: 1.e-4, cut: 1.e-10},
+  SelectiveLogTransform: {alpha: 1.0e-6, exclusions: [-5, -3, -4, -2, -1]},
+  SelfStandardize: {},
 }
 
 # Training
-lr: 1.e-5
-max_lr: 1.e-4
-batch_size: 256
-validate_every: 100
+lr: 1.e-4
+max_lr: 1.e-3
+batch_size: 2048
+validate_every: 1
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.01
+weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 50
-cycle_epochs: 50
-save_interval: 100
+n_epochs: 5000
+cycle_epochs: 5000
+save_interval: 5001
 
 # Sampling
 sample_periodically: False
-sample_every: 100
-sample_every_n_samples: 100
+sample_every: 4001
+sample_every_n_samples: 1000
 
 network: Resnet
 # network: SimpleUNet
@@ -40,19 +45,24 @@ network: Resnet
 dim: 373
 
 # ResNet block
-intermediate_dim: 256
+intermediate_dim: 4096
 n_blocks: 1
 n_con: 1
-layers_per_block: 3
+layers_per_block: 2
 conditional: True
+encode_t: True
+encode_t_dim: 32
+encode_c: True
+encode_c_dim: 32
+normalization: LayerNorm
 
 # U-Net
-hidden_dims: [256, 128, 64]
-condition_dim: 1
-encode_t: True
-encode_t_dim: 16
-encode_c: True
-encode_c_dim: 16
+# hidden_dims: [256, 128, 64]
+# condition_dim: 1
+# encode_t: True
+# encode_t_dim: 16
+# encode_c: True
+# encode_c_dim: 16
 
 # Preprocessing
 use_extra_dims: True
