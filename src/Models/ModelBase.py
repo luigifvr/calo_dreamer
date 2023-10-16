@@ -204,7 +204,7 @@ class GenerativeModel(nn.Module):
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
-                    self.plot_samples(samples=samples, conditions=c.reshape(-1, 1),name=self.epoch)
+                    self.plot_samples(samples=samples, conditions=c.reshape(-1, 1), name=self.epoch, energy=self.params['single_energy'])
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -235,7 +235,7 @@ class GenerativeModel(nn.Module):
             sampling_time = t_1 - t_0
             self.params["sampling_time"] = sampling_time
             print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
-            self.plot_samples(samples=samples, conditions=c.reshape(-1, 1))
+            self.plot_samples(samples=samples, conditions=c.reshape(-1, 1), energy=self.params['single_energy'])
 
     def train_one_epoch(self):
         # create list to save train_loss
@@ -332,13 +332,18 @@ class GenerativeModel(nn.Module):
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, conditions, name=""):
+    def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
         for fn in transforms[::-1]:
             samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
         self.save_sample(samples, conditions, name=name)
-        evaluate.main(f"-i {self.doc.basedir}/samples{name}.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
+        script_args = (
+            f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            f"-r {self.params['eval_hdf5_file']} -m all --cut 0.0 "
+            f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+        ) + (f" --energy {energy}" if energy is not None else '')
+        evaluate.main(script_args.split())
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
