@@ -30,7 +30,9 @@ class TBD(GenerativeModel):
             print(f"C is {self.C}")
 
         self.bayesian = get(self.params, "bayesian", 0)
-        self.distribution = torch.distributions.uniform.Uniform(low=0, high=1)
+        self.t_min = get(self.params, "t_min", 0)
+        self.t_max = get(self.params, "t_max", 1)
+        self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
 
 
     def build_net(self):
@@ -100,7 +102,7 @@ class TBD(GenerativeModel):
 
             x_t = solver(function,
                          x_T,
-                         torch.tensor([0, 1], dtype=dtype, device=device),
+                         torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
                          # atol = self.atol,
                          # rtol = self.rtol,
                          method='euler',

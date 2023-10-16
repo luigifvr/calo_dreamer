@@ -171,6 +171,15 @@ class GenerativeModel(nn.Module):
                     milestones=[2730, 8190, 13650, 27300],
                     gamma=0.5
                     )
+        elif self.lr_sched_mode == "CosineAnnealing":
+            n_epochs = params.get("cycle_epochs") or params["n_epochs"]
+            eta_min = params.get( "eta_min", 0)
+            self.model.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=self.optimizer,
+                T_max=n_epochs * steps_per_epoch,
+                eta_min=eta_min
+            )
+
 
     def run_training(self):
 
