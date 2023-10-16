@@ -21,6 +21,24 @@ class Standardize(object):
             transformed = (shower - self.means)/self.stds
         return transformed, energy
 
+class SelfStandardize(object):
+    """
+    Standardize features 
+        mean: vector of means 
+        std: vector of stds
+    """
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = shower*self.stds.to(shower.device) + self.means.to(shower.device)
+        else:
+            if hasattr(self, 'means'):
+                print('WARNING: Standardize transformation is recalculating modes!')
+            self.means = shower.mean(axis=0).to(shower.device)
+            self.stds = shower.std(axis=0).to(shower.device)
+            transformed = (shower - self.means)/self.stds
+        return transformed, energy
+
 class LogTransform(object):
     """
     Take log of input data
@@ -36,6 +54,26 @@ class LogTransform(object):
         else:
             shower = torch.clone(shower)
             transformed = torch.log(shower + self.alpha)
+        return transformed, energy
+
+class SelectiveLogTransform(object):
+    """
+    Take log of input data
+        alpha: regularization
+        exclusions: list of indices for features that should not be transformed
+    """
+    def __init__(self, alpha, exclusions=None):
+        self.alpha = alpha
+        self.exclusions = exclusions
+
+    def __call__(self, shower, energy, rev=False):
+        shower = torch.clone(shower)
+        if rev:
+            transformed = torch.exp(shower) - self.alpha
+        else:
+            transformed = torch.log(shower + self.alpha)
+        if self.exclusions is not None:
+            transformed[..., self.exclusions] = shower[..., self.exclusions]
         return transformed, energy
 
 class AddNoise(object):
