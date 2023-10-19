@@ -21,23 +21,23 @@ class Standardize(object):
             transformed = (shower - self.means)/self.stds
         return transformed, energy
 
-class SelfStandardize(object):
+class StandardizeFromFile(object):
     """
     Standardize features 
-        mean: vector of means 
-        std: vector of stds
+        mean: path to `.npy` file containing means of the features 
+        std: path to `.npy` file containing standard deviations of the features 
     """
+
+    def __init__(self, mean, std):
+        self.means = torch.from_numpy(np.load(mean))
+        self.stds = torch.from_numpy(np.load(std))
 
     def __call__(self, shower, energy, rev=False):
         if rev:
             transformed = shower*self.stds.to(shower.device) + self.means.to(shower.device)
         else:
-            if hasattr(self, 'means'):
-                print('WARNING: Standardize transformation is recalculating modes!')
-            self.means = shower.mean(axis=0).to(shower.device)
-            self.stds = shower.std(axis=0).to(shower.device)
-            transformed = (shower - self.means)/self.stds
-        return transformed, energy
+            transformed = (shower - self.means.to(shower.device))/self.stds.to(shower.device)
+        return transformed, energy        
 
 class LogTransform(object):
     """
@@ -98,6 +98,24 @@ class AddNoise(object):
             noise = self.func.sample(shower.shape)*self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy
+
+class ZeroMask(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, cut=0.):
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            transformed = shower
+        return transformed, energy        
 
 class AddPowerlawNoise(object):
     """

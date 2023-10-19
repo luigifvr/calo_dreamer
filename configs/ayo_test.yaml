@@ -1,5 +1,4 @@
-# run_name: large_tbd_test
-run_name: cfm_5000_epochs_nolog_5_4_3_2_1_layernorm
+run_name: cfm_10k_epochs
 p_type: photon
 dtype: float32
 
@@ -12,13 +11,19 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: "photon"
 eval_dataset: "1-photons"
-# single_energy: 262144.0
 transforms: {
-  NormalizeByElayer: {ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
-  AddNoise: {noise_width: 5.e-6},
-  # AddPowerlawNoise: {k: 1.e-4, cut: 1.e-10},
-  SelectiveLogTransform: {alpha: 1.0e-6, exclusions: [-5, -3, -4, -2, -1]},
-  SelfStandardize: {},
+    NormalizeByElayer: {
+        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml,
+        xml_file: photon
+    },
+    AddPowerlawNoise: {k: 1.0e-5, cut: 1.0e-6},
+    SelectiveLogTransform: {
+        alpha: 1.0e-6, exclusions: [-5, -3, -4, -2, -1]
+    },
+    StandardizeFromFile: {
+        mean: /home/aore/calo_dreamer/dat/means_1_photons_1.npy,
+        std: /home/aore/calo_dreamer/dat/stds_1_photons_1.npy
+    },
 }
 
 # Training
@@ -30,9 +35,9 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 5000
-cycle_epochs: 5000
-save_interval: 5001
+n_epochs: 10000
+cycle_epochs: 10000
+save_interval: 10001
 
 # Sampling
 sample_periodically: False
