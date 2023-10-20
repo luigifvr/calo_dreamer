@@ -196,7 +196,7 @@ class UpConv3DBlock(nn.Module):
         return out
 
 
-class UNet3D(nn.Module):
+class UNet(nn.Module):
     """
     :param param: A dictionary containing the relevant network parameters:
                   
@@ -216,7 +216,7 @@ class UNet3D(nn.Module):
 
     def __init__(self, param):
 
-        super(UNet3D, self).__init__()
+        super(UNet, self).__init__()
 
         defaults = {
             'condition_dim': 0,

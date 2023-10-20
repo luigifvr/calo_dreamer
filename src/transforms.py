@@ -49,10 +49,8 @@ class LogTransform(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            shower = torch.clone(shower)
             transformed = torch.exp(shower) - self.alpha
         else:
-            shower = torch.clone(shower)
             transformed = torch.log(shower + self.alpha)
         return transformed, energy
 
@@ -146,11 +144,27 @@ class NormalizeByEinc(object):
     """
     def __call__(self, shower, energy, rev=False):
         if rev:
-            shower *= energy
+            transformed = shower*energy
         else:
-            shower /= energy
-        return shower, energy
+            transformed = shower/energy
+        return transformed, energy
 
+class Reshape(object):
+    """
+    Reshape the shower as specified. Flattens batch in the reverse transformation.
+        shape -- Tuple representing the desired shape of a single example
+    """
+
+    def __init__(self, shape):
+        self.shape = torch.Size(shape)
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = shower.reshape(-1, self.shape.numel())
+        else:
+            transformed = shower.reshape(-1, *self.shape)
+        return transformed, energy
+    
 class NormalizeByElayer(object):
     """
     Normalize each shower by the layer energy
