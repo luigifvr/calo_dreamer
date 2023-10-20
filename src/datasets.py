@@ -22,8 +22,7 @@ class CaloChallengeDataset(Dataset):
         self.voxels, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
         self.energy, self.layers = get_energy_and_sorted_layers(self.voxels)
         del self.voxels
-        
-        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
+                
         self.transform = transform
         self.device = device
         self.dtype = torch.get_default_dtype()
@@ -35,6 +34,8 @@ class CaloChallengeDataset(Dataset):
             for fn in self.transform:
                 self.layers, self.energy = fn(self.layers, self.energy)
         self.energy = torch.log(self.energy/1e3)
+
+        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
 
         # make train/val split
         val_size = int(len(self.energy)*val_frac)

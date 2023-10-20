@@ -86,7 +86,7 @@ class TBD(GenerativeModel):
         dtype = batch.dtype
         device = batch.device
 
-        x_T = torch.randn((batch.shape[0], self.dim), dtype=dtype, device=device)
+        x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
             t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
@@ -126,7 +126,7 @@ class TBD(GenerativeModel):
         n_samples = samples.shape[0]
 
         def f(t, x_t):
-            x_t_torch = torch.Tensor(x_t).reshape((-1, self.dim)).to(self.device)
+            x_t_torch = torch.Tensor(x_t).reshape((-1, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
             with torch.no_grad():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
@@ -136,10 +136,10 @@ class TBD(GenerativeModel):
         with torch.no_grad():
             for i in range(int(n_samples / batch_size)):
                 sol = solve_ivp(f, (1, 0), samples[batch_size * i: batch_size * (i + 1)].flatten())
-                s = sol.y[:, -1].reshape(batch_size, self.dim)
+                s = sol.y[:, -1].reshape(batch_size, *self.shape)
                 events.append(s)
             sol = solve_ivp(f, (1, 0), samples[batch_size * (i+1):].flatten())
-            s = sol.y[:, -1].reshape(-1, self.dim)
+            s = sol.y[:, -1].reshape(-1, *self.shape)
             events.append(s)
         return np.concatenate(events, axis=0)[:n_samples]
 
@@ -149,10 +149,10 @@ class TBD(GenerativeModel):
         t_frames = np.linspace(0, 1, n_frames)
 
         batch_size = get(self.params, "batch_size", 8192)
-        x_T = np.random.randn(n_samples + batch_size, self.dim)
+        x_T = np.random.randn(n_samples + batch_size, *self.shape)
 
         def f(t, x_t):
-            x_t_torch = torch.Tensor(x_t).reshape((batch_size, self.dim)).to(self.device)
+            x_t_torch = torch.Tensor(x_t).reshape((batch_size, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
             with torch.no_grad():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
@@ -162,7 +162,7 @@ class TBD(GenerativeModel):
         with torch.no_grad():
             for i in range(int(n_samples / batch_size) + 1):
                 sol = solve_ivp(f, (0, 1), x_T[batch_size * i: batch_size * (i + 1)].flatten(), t_eval=t_frames)
-                s = sol.y.reshape(batch_size, self.dim, -1)
+                s = sol.y.reshape(batch_size, *self.shape, -1)
                 events.append(s)
         return np.concatenate(events, axis=0)[:n_samples]
 

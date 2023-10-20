@@ -23,7 +23,7 @@ class Resnet(nn.Module):
         self.intermediate_dim = self.param["intermediate_dim"]
 
         # input dimension
-        self.dim = self.param["dim"]
+        self.dim = self.param["shape"][0] # just a hack since resnet should only see 1d inputs
 
         # output dimension
         self.out_dim = self.param.get("out_dim", self.dim)

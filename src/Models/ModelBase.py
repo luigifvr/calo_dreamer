@@ -58,7 +58,7 @@ class GenerativeModel(nn.Module):
         self.doc = doc
         self.params = params
         self.device = device
-        self.dim = self.params["dim"]
+        self.shape = self.params['shape']#get(self.params,'shape')
         self.conditional = get(self.params,'conditional',False)
         self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
 
@@ -174,12 +174,11 @@ class GenerativeModel(nn.Module):
         elif self.lr_sched_mode == "CosineAnnealing":
             n_epochs = params.get("cycle_epochs") or params["n_epochs"]
             eta_min = params.get( "eta_min", 0)
-            self.model.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer=self.optimizer,
                 T_max=n_epochs * steps_per_epoch,
                 eta_min=eta_min
             )
-
 
     def run_training(self):
 
@@ -326,10 +325,19 @@ class GenerativeModel(nn.Module):
             for bay_layer in self.net.bayesian_layers:
                 bay_layer.random = None
         sample = []
-        # Ayo: TODO: generalise condition generation for datasets 2 & 3
-        condition = torch.tensor(self.generate_Einc_ds1(energy=self.single_energy), dtype=torch.get_default_dtype()).to(self.device)
+
+        condition = torch.tensor(
+            # Ayo: TODO: Generalise number of samples to generate
+            # Ayo: TODO: Handle single energy option for datasets 2 & 3
+            10**np.random.uniform(3, 6, size=10**5) 
+            if self.params['eval_dataset'] in ['2', '3'] else
+            self.generate_Einc_ds1(energy=self.single_energy),
+            dtype=torch.get_default_dtype(),
+            device=self.device
+        )
         
         # log-condition
+        # Ayo: TODO: Remove log here in favor of transforms that operate on energy.
         log_condition = torch.log(condition/1e3)
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
         log_condition_loader = DataLoader(dataset=log_condition, batch_size=batch_size_sample, shuffle=False)

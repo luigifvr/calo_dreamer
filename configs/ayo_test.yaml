@@ -1,12 +1,10 @@
-run_name: cfm_10k_epochs
-p_type: photon
+run_name: tbd_10k_epochs_uniform_5e-6
 dtype: float32
 
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_1.hdf5
 eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_2.hdf5
 xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml
-width_noise: 5.0e-6
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: "photon"
@@ -16,7 +14,8 @@ transforms: {
         ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml,
         xml_file: photon
     },
-    AddPowerlawNoise: {k: 1.0e-5, cut: 1.0e-6},
+    # AddPowerlawNoise: {k: 1.0e-5, cut: 1.0e-6},
+    AddNoise: {noise_width: 5.0e-6, cut: True},
     SelectiveLogTransform: {
         alpha: 1.0e-6, exclusions: [-5, -3, -4, -2, -1]
     },
@@ -47,7 +46,7 @@ sample_every_n_samples: 1000
 network: Resnet
 # network: SimpleUNet
 # dim: 368
-dim: 373
+shape: [373]
 
 # ResNet block
 intermediate_dim: 4096
@@ -60,18 +59,3 @@ encode_t_dim: 32
 encode_c: True
 encode_c_dim: 32
 normalization: LayerNorm
-
-# U-Net
-# hidden_dims: [256, 128, 64]
-# condition_dim: 1
-# encode_t: True
-# encode_t_dim: 16
-# encode_c: True
-# encode_c_dim: 16
-
-# Preprocessing
-use_extra_dims: True
-use_norm: False
-log_cond: True
-alpha: 1.0e-8
-alpha_logit: 1.0e-6
