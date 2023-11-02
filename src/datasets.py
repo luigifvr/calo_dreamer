@@ -33,8 +33,7 @@ class CaloChallengeDataset(Dataset):
         if self.transform:
             for fn in self.transform:
                 self.layers, self.energy = fn(self.layers, self.energy)
-        self.energy = torch.log(self.energy/1e3)
-
+        # self.energy = torch.log(self.energy/1e3)
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
 
         # make train/val split

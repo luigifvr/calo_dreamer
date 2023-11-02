@@ -155,6 +155,7 @@ class GenerativeModel(nn.Module):
                 params.get("max_lr", params["lr"]*10),
                 epochs = params.get("cycle_epochs") or params["n_epochs"],
                 steps_per_epoch=steps_per_epoch,
+                pct_start=params.get("cycle_pct_start", 0.3)
                 )
         elif self.lr_sched_mode == "cycle_lr":
             self.scheduler = torch.optim.lr_scheduler.CyclicLR(
@@ -261,14 +262,14 @@ class GenerativeModel(nn.Module):
                 loss.backward()
                 self.optimizer.step()
                 train_losses = np.append(train_losses, loss.item())
-                if self.log:
-                    self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+                # if self.log:
+                #     self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
 
                 if self.use_scheduler:
                     self.scheduler.step()
-                    if self.log:
-                        self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
-                                               self.epoch * self.n_trainbatches + batch_id)
+                    # if self.log:
+                    #     self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
+                    #                            self.epoch * self.n_trainbatches + batch_id)
 
             else:
                 print(f"train_model: Unstable loss. Skipped backprop for epoch {self.epoch}, batch_id {batch_id}")
@@ -292,8 +293,8 @@ class GenerativeModel(nn.Module):
                 loss = self.batch_loss(x)
 
                 val_losses = np.append(val_losses, loss.item())
-                if self.log:
-                    self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+                # if self.log:
+                #     self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
 
             self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
             self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
@@ -336,13 +337,18 @@ class GenerativeModel(nn.Module):
             device=self.device
         )
         
-        # log-condition
-        # Ayo: TODO: Remove log here in favor of transforms that operate on energy.
-        log_condition = torch.log(condition/1e3)
-        batch_size_sample = get(self.params, "batch_size_sample", 10000)
-        log_condition_loader = DataLoader(dataset=log_condition, batch_size=batch_size_sample, shuffle=False)
+        # transform-condition to basis used in training
+        dummy = torch.empty(1, *self.params['shape'])
+        transformed_cond = torch.clone(condition)
+        for fn in self.transforms:
+            if fn.__class__.__name__ != 'NormalizeByElayer':
+                dummy, transformed_cond = fn(dummy, transformed_cond)
 
-        sample = np.vstack([self.sample_batch(c) for c in log_condition_loader])
+        batch_size_sample = get(self.params, "batch_size_sample", 10000)
+        transformed_cond_loader = DataLoader(
+            dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
+        )
+        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
         return sample, condition.detach().cpu()
 
@@ -353,7 +359,7 @@ class GenerativeModel(nn.Module):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
         for fn in transforms[::-1]:
-            samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
+            samples, _ = fn(samples, conditions, rev=True) # undo preprocessing
         self.save_sample(samples, conditions, name=name)
         script_args = (
             f"-i {self.doc.basedir}/samples{name}.hdf5 "
