@@ -3,6 +3,7 @@ import numpy as np
 
 from challenge_files import *
 from challenge_files import XMLHandler
+from scipy.special import logit, expit
 
 class Standardize(object):
     """
@@ -24,20 +25,58 @@ class Standardize(object):
 class StandardizeFromFile(object):
     """
     Standardize features 
-        mean: path to `.npy` file containing means of the features 
-        std: path to `.npy` file containing standard deviations of the features 
+        mean_path: path to `.npy` file containing means of the features 
+        std_path: path to `.npy` file containing standard deviations of the features
+        create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, mean, std):
-        self.means = torch.from_numpy(np.load(mean))
-        self.stds = torch.from_numpy(np.load(std))
+    def __init__(self, mean_path, std_path, create=False):
+        self.mean_path = mean_path
+        self.std_path = std_path
+        self.create = create
+        self.written = False
+        try:
+            # load 
+            self.mean = torch.from_numpy(np.load(mean_path)).to(torch.get_default_dtype())
+            self.std = torch.from_numpy(np.load(std_path)).to(torch.get_default_dtype())
+        except FileNotFoundError as e:
+            if not create:
+                raise e
+
+    def write(self, shower, energy):
+        self.mean = shower.mean(axis=0)
+        self.std = shower.std(axis=0)
+        np.save(self.mean_path, self.mean.detach().cpu().numpy())
+        np.save(self.std_path, self.std.detach().cpu().numpy())
+        self.written = True
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = shower*self.stds.to(shower.device) + self.means.to(shower.device)
+            transformed = shower*self.std.to(shower.device) + self.mean.to(shower.device)
         else:
-            transformed = (shower - self.means.to(shower.device))/self.stds.to(shower.device)
-        return transformed, energy        
+            if self.create and not self.written:
+                self.write(shower, energy)
+            transformed = (shower - self.mean.to(shower.device))/self.std.to(shower.device)
+        return transformed, energy
+
+class ScaleEnergy(object):
+    """
+    Scale incident energies to lie in the range [0, 1]
+        e_min: Expected minimum value of the energy
+        e_max: Expected maximum value of the energy
+    """
+    def __init__(self, e_min, e_max):
+        self.e_min = e_min
+        self.e_max = e_max
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = energy * (self.e_max - self.e_min)
+            transformed += self.e_min
+        else:
+            transformed = energy - self.e_min
+            transformed /= (self.e_max - self.e_min)
+        return shower, transformed
 
 class LogTransform(object):
     """
@@ -60,19 +99,45 @@ class SelectiveLogTransform(object):
         alpha: regularization
         exclusions: list of indices for features that should not be transformed
     """
-    def __init__(self, alpha, exclusions=None):
+    def __init__(self, alpha, exclusions=None, include_E=False):
         self.alpha = alpha
         self.exclusions = exclusions
+        self.include_E = include_E
 
     def __call__(self, shower, energy, rev=False):
-        shower = torch.clone(shower)
         if rev:
             transformed = torch.exp(shower) - self.alpha
+            E_transformed = torch.exp(energy) if self.include_E else energy
         else:
             transformed = torch.log(shower + self.alpha)
+            E_transformed = torch.log(energy) if self.include_E else energy
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions]
-        return transformed, energy
+        
+        return transformed, E_transformed
+
+class SelectiveLogitTransform(object):
+    """
+    Take log of input data
+        delta: regularization
+        inclusions: list of indices for features that should be transformed
+    """
+    def __init__(self, delta, inclusions=None, include_E=False):
+        self.delta = delta
+        self.inclusions = inclusions
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = shower.clone()
+            transformed[..., self.inclusions] = torch.special.expit(
+                shower[..., self.inclusions]
+            )
+        else:
+            transformed = shower.clone()
+            transformed[..., self.inclusions] = torch.special.logit(
+                shower[..., self.inclusions], eps=self.delta
+            )
+        return transformed, energy     
 
 class AddNoise(object):
     """
@@ -96,6 +161,33 @@ class AddNoise(object):
             noise = self.func.sample(shower.shape)*self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy
+
+class SelectiveUniformNoise(object):
+    """
+    Add noise to input data with the option to exlude some features
+        func: torch distribution used to sample from
+        width_noise: noise rescaling
+        exclusions: list of indices for features that should not be transformed
+    """
+    def __init__(self, noise_width, exclusions = None, cut=False):
+        #self.func = func
+        self.func = torch.distributions.Uniform(torch.tensor(0.0), torch.tensor(1.0))
+        self.noise_width = noise_width
+        self.exclusions = exclusions
+        self.cut = cut # apply cut if True
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.noise_width)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            noise = self.func.sample(shower.shape)*self.noise_width
+            if self.exclusions:
+                noise[:, self.exclusions] = 0.0
+            transformed = shower + noise.reshape(shower.shape).to(shower.device)
+        return transformed, energy        
 
 class ZeroMask(object):
     """
@@ -184,7 +276,7 @@ class NormalizeByElayer(object):
             #shower = shower.to(torch.float64)
 
             extra_dims = shower[..., -self.number_of_layers:]
-            extra_dims[:, (-self.number_of_layers+1):] = torch.clip(extra_dims[:, (-self.number_of_layers+1):], min=torch.tensor(0.), max=torch.tensor(1.))   #clipping 
+            extra_dims[:, (-self.number_of_layers+1):] = torch.clip(extra_dims[:, (-self.number_of_layers+1):], min=torch.tensor(0., device=shower.device), max=torch.tensor(1., device=shower.device))   #clipping 
             shower = shower[:, :-self.number_of_layers]
             transformed = torch.zeros_like(shower)
 
