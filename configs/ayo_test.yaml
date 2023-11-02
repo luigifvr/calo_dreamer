@@ -1,4 +1,4 @@
-run_name: tbd_10k_epochs_uniform_5e-6
+run_name: tbd_25k_epochs_logitu
 dtype: float32
 
 # Data
@@ -14,29 +14,34 @@ transforms: {
         ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml,
         xml_file: photon
     },
-    # AddPowerlawNoise: {k: 1.0e-5, cut: 1.0e-6},
-    AddNoise: {noise_width: 5.0e-6, cut: True},
+    SelectiveUniformNoise: {noise_width: 5.0e-6, cut: True, exclusions: [-5, -4, -3, -2, -1]},
     SelectiveLogTransform: {
-        alpha: 1.0e-6, exclusions: [-5, -3, -4, -2, -1]
+        alpha: 1.0e-6, exclusions: [-5, -4, -3, -2, -1], include_E: True
+    },
+    SelectiveLogitTransform: {
+        delta: 1.0e-6, inclusions: [-4, -3, -2, -1]
     },
     StandardizeFromFile: {
-        mean: /home/aore/calo_dreamer/dat/means_1_photons_1.npy,
-        std: /home/aore/calo_dreamer/dat/stds_1_photons_1.npy
+        mean_path: /home/aore/calo_dreamer/dat/means_1_photons_1_logitu.npy,
+        std_path: /home/aore/calo_dreamer/dat/stds_1_photons_1_logitu.npy,
+        create: True
     },
+    ScaleEnergy: {e_min: 5.545177, e_max: 15.249238},
 }
 
 # Training
-lr: 1.e-4
-max_lr: 1.e-3
-batch_size: 2048
+lr: 1.e-3
+max_lr: 5.e-4
+batch_size: 4000
 validate_every: 1
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 10000
-cycle_epochs: 10000
-save_interval: 10001
+n_epochs: 25_000
+cycle_epochs: 25_000
+cycle_pct_start: 0.1
+save_interval: 100_001
 
 # Sampling
 sample_periodically: False
@@ -44,18 +49,16 @@ sample_every: 4001
 sample_every_n_samples: 1000
 
 network: Resnet
-# network: SimpleUNet
-# dim: 368
 shape: [373]
 
 # ResNet block
-intermediate_dim: 4096
-n_blocks: 1
+intermediate_dim: 2000
+n_blocks: 3
 n_con: 1
 layers_per_block: 2
 conditional: True
 encode_t: True
-encode_t_dim: 32
+encode_t_dim: 100
 encode_c: True
-encode_c_dim: 32
+encode_c_dim: 100
 normalization: LayerNorm
