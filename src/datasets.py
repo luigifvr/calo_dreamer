@@ -9,7 +9,7 @@ from transforms import *
 class CaloChallengeDataset(Dataset):
     """ Dataset for CaloChallenge showers """
     def __init__(self, hdf5_file, particle_type, xml_filename, val_frac=0.3, 
-            transform=None, split='training', device='cpu', single_energy=None):
+            transform=None, split=None, device='cpu', single_energy=None):
         """
         Arguments:
             hdf5_file: path to hdf5 file
@@ -18,7 +18,6 @@ class CaloChallengeDataset(Dataset):
             transform: list of transformations
         """
         
-        # TODO: Use `val_frac` argument to select subset of data according to `split`
         self.voxels, self.layer_boundaries = load_data(hdf5_file, particle_type, xml_filename, single_energy=single_energy)
         self.energy, self.layers = get_energy_and_sorted_layers(self.voxels)
         del self.voxels
@@ -37,21 +36,16 @@ class CaloChallengeDataset(Dataset):
         print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
 
         # make train/val split
-        val_size = int(len(self.energy)*val_frac)
-        trn_size = len(self.energy) - val_size
-        self.data = torch.utils.data.random_split(
-            torch.utils.data.TensorDataset(self.layers, self.energy),
-            [trn_size, val_size]
-        )[0 if split=='training' else 1 if split=='validation' else None]
+        if split is not None:
+            val_size = int(len(self.energy)*val_frac)
+            trn_size = len(self.energy) - val_size
+            self.data = torch.utils.data.random_split(
+                torch.utils.data.TensorDataset(self.layers, self.energy),
+                [trn_size, val_size]
+            )[0 if split=='training' else 1 if split=='validation' else None]
         
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        
-        # Testing loading everything on GPU
-        #showers = torch.tensor(self.layers[idx]).to(device=self.device)
-        #energies = torch.tensor(self.energy[idx]).to(device=self.device)
-        # showers = self.layers[idx]
-        # energies = self.energy[idx]
         return self.data[idx]

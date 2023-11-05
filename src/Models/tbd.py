@@ -82,7 +82,7 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        batch = batch[:, None]
+        # batch = batch[:, None] # moved to before sample_batch call
         dtype = batch.dtype
         device = batch.device
 
