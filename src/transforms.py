@@ -34,13 +34,15 @@ class StandardizeFromFile(object):
         self.mean_path = mean_path
         self.std_path = std_path
         self.create = create
-        self.written = False
         try:
-            # load 
+            # load from file
             self.mean = torch.from_numpy(np.load(mean_path)).to(torch.get_default_dtype())
             self.std = torch.from_numpy(np.load(std_path)).to(torch.get_default_dtype())
+            self.written = True
         except FileNotFoundError as e:
-            if not create:
+            if create:
+                self.written = False
+            else:
                 raise e
 
     def write(self, shower, energy):
