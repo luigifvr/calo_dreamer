@@ -100,14 +100,25 @@ class TBD(GenerativeModel):
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
 
-            x_t = solver(function,
-                         x_T,
-                         torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                         # atol = self.atol,
-                         # rtol = self.rtol,
-                         method='euler',
-                         options={"step_size": 0.01}
-                         ).detach().cpu().numpy()
+            try:
+                x_t = solver(function,
+                             x_T,
+                             torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                             atol=1.e-6,
+                             rtol=1.e-3,
+                             # method = 'rk4',
+                             # options= {"step_size": 0.01}
+                             ).detach().cpu().numpy()
+            except AssertionError:
+                print(f"failed ode try")
+                x_t = solver(function,
+                             x_T,
+                             torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                             atol=1.e-6,
+                             rtol=1.e-3,
+                             method='rk4',
+                             options={"step_size": 0.01}
+                             ).detach().cpu().numpy()
 
             events.append(x_t[-1])
         return np.concatenate(events, axis=0)
