@@ -110,8 +110,6 @@ class TBD(GenerativeModel):
                              torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
                              atol=1.e-6,
                              rtol=1.e-3,
-                             # method = 'rk4',
-                             # options= {"step_size": 0.01}
                              ).detach().cpu().numpy()
             except AssertionError:
                 print(f"failed ode try")
