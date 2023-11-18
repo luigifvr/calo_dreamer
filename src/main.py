@@ -52,7 +52,7 @@ def main():
         x, c = model.sample_n()
         model.plot_samples(x, c, name=f"{args.epoch}")
         #run plotting script
-        evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
+        evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m hist-p -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 1.0".split())
 
 if __name__=='__main__':
     main()

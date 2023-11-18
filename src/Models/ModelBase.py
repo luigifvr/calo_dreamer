@@ -308,8 +308,8 @@ class GenerativeModel(nn.Module):
 
     def generate_Einc_ds1(self, energy=None, sample_multiplier=1000):
         """ generate the incident energy distribution of CaloChallenge ds1
-                        sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
-                        and 5, 3, 2, 1 times sample multiplier for the highest energies
+            sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
+            and 5, 3, 2, 1 times sample multiplier for the highest energies
 
         """
         ret = np.logspace(8, 18, 11, base=2)
@@ -344,7 +344,6 @@ class GenerativeModel(nn.Module):
         transformed_cond = torch.clone(Einc)
         for fn in self.transforms:
             if hasattr(fn, 'cond_transform'):
-            # if fn.__class__.__name__ != 'NormalizeByElayer':
                 dummy, transformed_cond = fn(dummy, transformed_cond)
 
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
@@ -359,7 +358,7 @@ class GenerativeModel(nn.Module):
             u_samples = torch.from_numpy(np.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
             ])).to(self.device)
-            transformed_cond = torch.cat([transformed_cond, u_samples], dim=1) # 1st dimension transformed!
+            transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             transformed_cond_loader = DataLoader(
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
@@ -376,12 +375,11 @@ class GenerativeModel(nn.Module):
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
 
         if self.params['model_type'] == 'shape':   
+            # postprocess
             for fn in transforms[::-1]:
-                # if not hasattr(fn, 'cond_transform'): # E_inc already postprocessed
                 if self.params['model_type'] == 'energy' and fn.__class__.__name__ == 'NormalizeByElayer':
                     continue
                 samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
-
             self.save_sample(samples, conditions, name=name)
             script_args = (
                 f"-i {self.doc.basedir}/samples{name}.hdf5 "
@@ -399,6 +397,7 @@ class GenerativeModel(nn.Module):
                 device=self.device,
                 single_energy=self.single_energy
             ).layers
+            # postprocess
             for fn in transforms[::-1]:
                 if fn.__class__.__name__ != 'NormalizeByElayer':
                     samples, _ = fn(samples, conditions, rev=True)
@@ -407,8 +406,11 @@ class GenerativeModel(nn.Module):
             samples[:,1:] = torch.clip(samples[:,1:], min=0., max=1.)
             reference[:,1:] = torch.clip(reference[:,1:], min=0., max=1.)
             
-            fig, ax = plot_ui_dists(samples.detach().cpu().numpy(), reference.detach().cpu().numpy())
-            fig.savefig(f'{self.doc.basedir}/u_dists{name}.pdf', bbox_inches='tight')
+            plot_ui_dists(
+                samples.detach().cpu().numpy(),
+                reference.detach().cpu().numpy(),
+                documenter=self.doc
+            )      
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

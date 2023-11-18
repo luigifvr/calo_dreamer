@@ -126,6 +126,7 @@ class Conv3DBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, cond_dim=None, bottleneck = False) -> None:
         super(Conv3DBlock, self).__init__()
+        self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3,3,3), padding=1)
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
@@ -140,7 +141,8 @@ class Conv3DBlock(nn.Module):
 
         res = self.conv1(input)
         if condition is not None:
-            res = res + self.cond_layer(condition).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)        
+            # res = res + self.cond_layer(condition).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)        
+            res = res + self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
         res = self.act(self.bn1(res))
         res = self.act(self.bn2(self.conv2(res)))
         out = None
@@ -167,6 +169,7 @@ class UpConv3DBlock(nn.Module):
     def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, num_classes=None) -> None:
         super(UpConv3DBlock, self).__init__()
         assert (last_layer==False and num_classes==None) or (last_layer==True and num_classes!=None), 'Invalid arguments'
+        self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         self.upconv1 = nn.ConvTranspose3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 2, 3), stride=(3,2,3))
         self.act = nn.SiLU()
@@ -189,7 +192,8 @@ class UpConv3DBlock(nn.Module):
             out = out + residual
         out = self.conv1(out)
         if condition is not None:
-            out = out + self.cond_layer(condition).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            # out = out + self.cond_layer(condition).unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            out = out + self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
         out = self.act(self.bn1(out))
         out = self.act(self.bn2(self.conv2(out)))
         if self.last_layer: out = self.conv3(out)
@@ -273,7 +277,7 @@ class UNet(nn.Module):
         
         if self.embed_t:
             t = self.t_embdding(t)
-        if self.condition_dim == 0:
+        if c is None:
             condition = t
         else:
             if self.embed_c:

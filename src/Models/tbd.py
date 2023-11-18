@@ -24,7 +24,6 @@ class TBD(GenerativeModel):
         except AttributeError:
             raise NotImplementedError(f"build_model: Trajectory type {trajectory} not implemented")
 
-
         self.C = get(self.params, "C", 1)
         if self.C != 1:
             print(f"C is {self.C}")
@@ -50,10 +49,11 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        x = input[0].clone()
+        # x = input[0].clone()
         condition = input[1]
         weights = None
-        return x, condition, weights
+        # return x, condition, weights
+        return input[0], condition, weights
 
     def batch_loss(self, x):
         """
@@ -62,13 +62,15 @@ class TBD(GenerativeModel):
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
         #x = x[:,:10]
-        t = self.distribution.sample((x.size(0),1)).to(x.device)
+        
+        # t = self.distribution.sample((x.size(0),1)).to(x.device)
+        t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
-        drift = self.net(x_t, t, condition)
+        drift = self.net(x_t, t.view(-1, 1), condition)
 
-        loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
+        loss = torch.mean((drift - x_t_dot) ** 2)#* torch.exp(self.t_factor * t)) ?
         # self.regular_loss.append(loss.detach().cpu().numpy())
         # if self.C != 0:
             # kl_loss = self.C*self.net.kl / self.n_traindata
@@ -105,9 +107,9 @@ class TBD(GenerativeModel):
                          torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
                          # atol = self.atol,
                          # rtol = self.rtol,
-                         method='euler',
-                         options={"step_size": 0.01}
-                         ).detach().cpu().numpy()
+                         method='midpoint',
+                         options={"step_size": 0.005}
+                         ).detach().cpu().numpy()          
 
             events.append(x_t[-1])
         return np.concatenate(events, axis=0)
