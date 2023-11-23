@@ -1,8 +1,8 @@
-run_name: energy_model
+run_name: photon_energy_model
 dtype: float32
 
 # Model
-model_type: 'energy'
+model_type: energy
 
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_1.hdf5
@@ -37,7 +37,7 @@ batch_size: 1000
 validate_every: 1
 use_scheduler: True
 lr_scheduler: one_cycle_lr 
-weight_decay: 0.001
+weight_decay: 0.01
 betas: [0.9, 0.999]
 n_epochs: 3000
 cycle_epochs: 3000
@@ -48,6 +48,7 @@ save_interval: 100_001
 sample_periodically: False
 sample_every: 4001
 sample_every_n_samples: 1000
+solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
 
 network: Resnet
 shape: [5] # number of calorimeter layers

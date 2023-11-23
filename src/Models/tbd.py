@@ -91,7 +91,11 @@ class TBD(GenerativeModel):
         x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # print(x_t.shape)
+            # print(t_torch.shape)
+            # print(batch.shape)
+            t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
             v = self.net(x_t, t_torch, batch)
 
             return v
@@ -105,10 +109,7 @@ class TBD(GenerativeModel):
             x_t = solver(function,
                          x_T,
                          torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                         # atol = self.atol,
-                         # rtol = self.rtol,
-                         method='midpoint',
-                         options={"step_size": 0.005}
+                         **self.params.get("solver_kwargs", {})
                          ).detach().cpu().numpy()          
 
             events.append(x_t[-1])
