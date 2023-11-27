@@ -165,6 +165,28 @@ class SelectiveLogTransform(object):
             transformed[..., self.exclusions] = shower[..., self.exclusions]
         return transformed, energy
 
+
+class ExclusiveLogitTransform(object):
+    """
+    Take log of input data
+        delta: regularization
+        exclusions: list of indices for features that should not be transformed
+    """
+
+    def __init__(self, delta, exclusions=None):
+        self.delta = delta
+        self.exclusions = exclusions
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = torch.special.expit(shower)
+        else:
+            transformed = torch.special.logit(shower, eps=self.delta)
+        if self.exclusions is not None:
+            transformed[..., self.exclusions] = shower[..., self.exclusions]            
+        return transformed, energy
+
+
 class SelectiveLogitTransform(object):
     """
     Take log of input data
@@ -186,7 +208,7 @@ class SelectiveLogitTransform(object):
             transformed[..., self.inclusions] = torch.special.logit(
                 shower[..., self.inclusions], eps=self.delta
             )
-        return transformed, energy     
+        return transformed, energy
 
 class AddNoise(object):
     """

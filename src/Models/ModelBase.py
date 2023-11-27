@@ -355,7 +355,7 @@ class GenerativeModel(nn.Module):
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
             # sample us
-            u_samples = torch.from_numpy(np.vstack([
+            u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
                 energy_model.sample_batch(c) for c in transformed_cond_loader
             ])).to(self.device)
             transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
@@ -374,21 +374,7 @@ class GenerativeModel(nn.Module):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
 
-        if self.params['model_type'] == 'shape':   
-            # postprocess
-            for fn in transforms[::-1]:
-                if self.params['model_type'] == 'energy' and fn.__class__.__name__ == 'NormalizeByElayer':
-                    continue
-                samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
-            self.save_sample(samples, conditions, name=name)
-            script_args = (
-                f"-i {self.doc.basedir}/samples{name}.hdf5 "
-                f"-r {self.params['eval_hdf5_file']} -m all --cut 0.0 "
-                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
-            ) + (f" --energy {energy}" if energy is not None else '')
-            evaluate.main(script_args.split())
-
-        elif self.params['model_type'] == 'energy':
+        if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(
                 self.params.get('eval_hdf5_file'),
                 self.params.get('particle_type'),
@@ -397,6 +383,7 @@ class GenerativeModel(nn.Module):
                 device=self.device,
                 single_energy=self.single_energy
             ).layers
+            
             # postprocess
             for fn in transforms[::-1]:
                 if fn.__class__.__name__ != 'NormalizeByElayer':
@@ -410,7 +397,18 @@ class GenerativeModel(nn.Module):
                 samples.detach().cpu().numpy(),
                 reference.detach().cpu().numpy(),
                 documenter=self.doc
-            )      
+            )
+        else:
+            # postprocess
+            for fn in transforms[::-1]:
+                samples, conditions = fn(samples, conditions, rev=True)
+            self.save_sample(samples, conditions, name=name)
+            script_args = (
+                f"-i {self.doc.basedir}/samples{name}.hdf5 "
+                f"-r {self.params['eval_hdf5_file']} -m all --cut 0.0 "
+                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+            ) + (f" --energy {energy}" if energy is not None else '')
+            evaluate.main(script_args.split())
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""

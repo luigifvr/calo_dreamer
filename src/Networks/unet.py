@@ -230,6 +230,7 @@ class UNet(nn.Module):
             'level_channels': [16, 64, 128],
             'encode_t': False,
             'encode_t_dim': 32,
+            'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
             'activation': nn.SiLU(),
@@ -246,7 +247,7 @@ class UNet(nn.Module):
 
         if self.encode_t_dim:
             fourier_proj = GaussianFourierProjection(
-                encode_dim=self.encode_t_dim, scale=self.encode_t_scale
+                embed_dim=self.encode_t_dim, scale=self.encode_t_scale
             )
             self.t_encoding = nn.Sequential(
                 fourier_proj, nn.Linear(self.encode_t_dim, self.encode_t_dim)
@@ -460,7 +461,7 @@ class PaddedUNet(nn.Module):
             + (self.encode_c_dim if self.encode_c else self.condition_dim)
         if self.encode_t_dim:
             fourier_proj = GaussianFourierProjection(
-                encode_dim=self.encode_t_dim, scale=self.encode_t_scale
+                embed_dim=self.encode_t_dim, scale=self.encode_t_scale
             )
             self.t_encoding = nn.Sequential(
                 fourier_proj, nn.Linear(self.encode_t_dim, self.encode_t_dim)

@@ -39,7 +39,7 @@ def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0, 2), num_bin
         # main_ax.set_xlim(*np.quantile(total, quantiles[[4,-4]]))
         # main_ax.autoscale(axis='y')
         main_ax.set_ylim(None, min(main_ax.get_ylim()[1], 200))
-        main_ax.set_title(f"$u_{i}$")
+        main_ax.set_title(f"$u_{{{i}}}$")
 
         ratio = gen_vals/ref_vals
         ratio_ax.plot(main_ax.get_xlim(), [1, 1], color='#646464', ls='--')
@@ -60,4 +60,6 @@ def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0, 2), num_bin
             )
         else:
             plt.show()
+        
+        plt.close(fig)
 

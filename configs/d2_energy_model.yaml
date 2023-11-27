@@ -19,9 +19,7 @@ transforms: {
         xml_file: electron
     },
     SelectDims: {start: -45, end: 0},
-    SelectiveLogitTransform: {
-        delta: 1.0e-6, inclusions: [-44, -43, -42, -41, -40, -39, -38, -37, -36, -35, -34, -33, -32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1],
-    },
+    ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
     StandardizeFromFile: {
         mean_path: /home/aore/calo_dreamer/dat/means_2_1_us.npy,
         std_path: /home/aore/calo_dreamer/dat/stds_2_1_us.npy,
@@ -34,14 +32,14 @@ transforms: {
 # Training
 lr: 1.e-4
 max_lr: 1.e-3
-batch_size: 1000
+batch_size: 2000
 validate_every: 1
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 3000
-cycle_epochs: 3000
+n_epochs: 5000
+cycle_epochs: 5000
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -55,7 +53,7 @@ network: Resnet
 shape: [45] # number of calorimeter layers
 
 # ResNet block
-intermediate_dim: 256
+intermediate_dim: 512
 n_blocks: 8
 n_con: 1
 layers_per_block: 2
