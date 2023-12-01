@@ -183,7 +183,7 @@ class ExclusiveLogitTransform(object):
         else:
             transformed = torch.special.logit(shower, eps=self.delta)
         if self.exclusions is not None:
-            transformed[..., self.exclusions] = shower[..., self.exclusions]            
+            transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy
 
 
@@ -323,10 +323,10 @@ class Reshape(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = shower.reshape(-1, self.shape.numel())
+            shower = shower.reshape(-1, self.shape.numel())
         else:
-            transformed = shower.reshape(-1, *self.shape)
-        return transformed, energy
+            shower = shower.reshape(-1, *self.shape)
+        return shower, energy
     
 class NormalizeByElayer(object):
     """
