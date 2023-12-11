@@ -77,25 +77,30 @@ class GenerativeModel(nn.Module):
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
         self.validate_every = get(self.params, "validate_every", 50)
 
-        #init preprocessing
+        # init preprocessing
         self.transforms = get_transformations(params.get('transforms', None))
-        self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
-                                                                    params.get('particle_type'),
-                                                                    params.get('xml_filename'),
-                                                                    params.get('val_frac'),
-                                                                    params.get('batch_size'),
-                                                                    self.transforms,
-                                                                    params.get('eps', 1.e-10),
-                                                                    device=device,
-                                                                    shuffle=True,
-                                                                    width_noise=params.get('width_noise', 1.e-6),
-                                                                    single_energy=params.get('single_energy', None))
 
     def build_net(self):
         pass
 
     def prepare_training(self):
+        
         print("train_model: Preparing model training")
+
+        self.train_loader, self.val_loader, self.bounds = get_loaders(
+            self.params.get('hdf5_file'),
+            self.params.get('particle_type'),
+            self.params.get('xml_filename'),
+            self.params.get('val_frac'),
+            self.params.get('batch_size'),
+            self.transforms,
+            self.params.get('eps', 1.e-10),
+            device=self.device,
+            shuffle=True,
+            width_noise=self.params.get('width_noise', 1.e-6),
+            single_energy=self.params.get('single_energy', None)
+        )
+
         self.use_scheduler = get(self.params, "use_scheduler", False)
         self.train_losses = np.array([])
         self.train_losses_epoch = np.array([])
@@ -207,15 +212,17 @@ class GenerativeModel(nn.Module):
                 if (self.epoch + 1) % self.sample_every == 0:
                     self.eval()
 
-                    # if true then i * bayesian samples will be drawn, else just 1
-                    iterations = self.iterations if self.iterate_periodically else 1
-                    bay_samples = []
-                    for i in range(0, iterations):
-                        sample, c = self.sample_n()
-                        bay_samples.append(sample)
+                    # # if true then i * bayesian samples will be drawn, else just 1
+                    # iterations = self.iterations if self.iterate_periodically else 1
+                    # bay_samples = []
+                    # for i in range(0, iterations):
+                    #     sample, c = self.sample_n()
+                    #     bay_samples.append(sample)
+                    # samples = np.concatenate(bay_samples)
 
-                    samples = np.concatenate(bay_samples)
+                    samples, c = self.sample_n()
                     self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.params['single_energy'])
+                    # self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.params['single_energy'])
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -355,24 +362,39 @@ class GenerativeModel(nn.Module):
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
             # sample us
-            u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
+            u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ])).to(self.device)
+            ])          
+
+            # # post-process u-samples according to energy config
+            # dummy = torch.empty(1, 1)
+            # for fn in energy_model.transforms[:0:-1]: # skip NormalizeByElayer
+            #     u_samples, dummy = fn(u_samples, dummy, rev=True)
+            
+            # # pre-process u-samples according to shape config
+            # # TODO: Is there a cleaner way to do this but without instantiating voxel-sized tensor?
+            # for fn in self.transforms:
+            #     if fn.__class__.__name__ == 'ExclusiveLogitTransform':
+            #         u_samples, dummy = fn(u_samples, dummy)
+            #     elif fn.__class__.__name__ == 'StandardizeFromFile':
+            #         u_samples *= fn.std[-u_samples.shape[1]:].to(self.device)
+            #         u_samples += fn.mean[-u_samples.shape[1]:].to(self.device)
+
             transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             transformed_cond_loader = DataLoader(
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        return sample, transformed_cond.detach().cpu()
+        return sample, transformed_cond
 
     def sample_batch(self, batch):
         pass
 
     def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
-        samples = torch.from_numpy(samples) # since transforms expect torch.tensor
+        # samples = torch.from_numpy(samples) # since transforms expect torch.tensor
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(
@@ -402,11 +424,15 @@ class GenerativeModel(nn.Module):
             # postprocess
             for fn in transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
+            
+            samples = samples.detach().cpu()
+            conditions = conditions.detach().cpu()
+
             self.save_sample(samples, conditions, name=name)
             script_args = (
                 f"-i {self.doc.basedir}/samples{name}.hdf5 "
                 f"-r {self.params['eval_hdf5_file']} -m all --cut 0.0 "
-                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/epoch_{name}/"
             ) + (f" --energy {energy}" if energy is not None else '')
             evaluate.main(script_args.split())
 

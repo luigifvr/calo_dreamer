@@ -186,7 +186,7 @@ class ExclusiveLogitTransform(object):
             transformed[..., self.exclusions] = shower[..., self.exclusions]            
         return transformed, energy
 
-
+# Depracated
 class SelectiveLogitTransform(object):
     """
     Take log of input data
@@ -231,6 +231,44 @@ class AddNoise(object):
         else:
             noise = self.func.sample(shower.shape)*self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
+        return transformed, energy
+
+
+class SmoothUPeaks(object):
+    """
+    Smooth voxels equal to 0 or 1 using uniform noise
+        w0: noise width for zeros
+        w1: noise width for ones
+        eps: threshold below which values are considered zero
+    """
+
+    def __init__(self, w0, w1, eps=1.e-10):
+        self.func = torch.distributions.Uniform(
+            torch.tensor(0.0), torch.tensor(1.0))
+        self.w0 = w0
+        self.w1 = w1
+        self.scale = 1 + w0 + w1
+        self.eps = eps
+
+    def __call__(self, u, energy, rev=False):
+        if rev:
+            # undo scaling
+            transformed = u*self.scale - self.w0
+            # clip to [0, 1]
+            transformed = torch.clip(transformed, min=0., max=1.)
+            # restore u0
+            transformed[:, 0] = u[:, 0]
+        else:
+            # sample noise values
+            n0 = self.w0*self.func.sample(u.shape).to(u.device)
+            n1 = self.w1*self.func.sample(u.shape).to(u.device)
+            # add noise to us
+            transformed = u - n0*(u<=self.eps) + n1*(u>=1-self.eps)
+            # scale to [0,1] in preparation for logit
+            transformed = (transformed + self.w0)/self.scale
+            # restore u0
+            transformed[:, 0] = u[:, 0]
+            
         return transformed, energy
 
 class SelectiveUniformNoise(object):

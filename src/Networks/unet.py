@@ -436,7 +436,7 @@ class PaddedUNet(nn.Module):
 
     def __init__(self, param):
 
-        super(UNet, self).__init__()
+        super(PaddedUNet, self).__init__()
 
         defaults = {
             'condition_dim': 0,

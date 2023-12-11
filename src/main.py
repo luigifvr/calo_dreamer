@@ -7,7 +7,6 @@ import torch
 from documenter import Documenter
 from Models import *
 from Models.tbd import TBD
-from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -51,8 +50,6 @@ def main():
         model.load(args.epoch)
         x, c = model.sample_n()
         model.plot_samples(x, c, name=f"{args.epoch}")
-        #run plotting script
-        # evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m hist-p -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 1.0".split())
 
 if __name__=='__main__':
     main()
