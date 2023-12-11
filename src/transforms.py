@@ -61,6 +61,56 @@ class StandardizeFromFile(object):
             transformed = (shower - self.mean.to(shower.device))/self.std.to(shower.device)
         return transformed, energy
 
+class SelectDims(object):
+    """
+    Selects a subset of the features 
+        start: start of range of indices to keep
+        end:   end of range of indices to keep (exclusive)
+    """
+
+    def __init__(self, start, end):
+        self.indices = torch.arange(start, end)
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+           return shower, energy
+        transformed = shower[..., self.indices]
+        return transformed, energy
+
+class AddFeaturesToCond(object):
+    """
+    Transfers a subset of the input features to the condition
+        split_index: Index at which to split input. Features past the index will be moved
+    """
+
+    def __init__(self, split_index):
+        self.split_index = split_index
+    
+    def __call__(self, x, c, rev=False):
+        
+        if rev:
+            c_, split = c[:, :1], c[:, 1:]
+            x_ = torch.cat([x, split], dim=1)
+        else:
+            x_, split = x[:, :self.split_index], x[:, self.split_index:]
+            c_ = torch.cat([c, split], dim=1)
+        return x_, c_
+    
+class LogEnergy(object):
+    """
+    Log transform incident energies
+        alpha: Optional regularization for the log
+    """            
+    def __init__(self, alpha=0.):
+        self.alpha = alpha
+        self.cond_transform = True
+        
+    def __call__(self, shower, energy, rev=False):
+            if rev:
+                transformed = torch.exp(energy) - self.alpha
+            else:
+                transformed = torch.log(energy + self.alpha)
+            return shower, transformed              
+
 class ScaleEnergy(object):
     """
     Scale incident energies to lie in the range [0, 1]
@@ -70,6 +120,7 @@ class ScaleEnergy(object):
     def __init__(self, e_min, e_max):
         self.e_min = e_min
         self.e_max = e_max
+        self.cond_transform = True
 
     def __call__(self, shower, energy, rev=False):
         if rev:
@@ -101,23 +152,41 @@ class SelectiveLogTransform(object):
         alpha: regularization
         exclusions: list of indices for features that should not be transformed
     """
-    def __init__(self, alpha, exclusions=None, include_E=False):
+    def __init__(self, alpha, exclusions=None):
         self.alpha = alpha
         self.exclusions = exclusions
-        self.include_E = include_E
 
     def __call__(self, shower, energy, rev=False):
         if rev:
             transformed = torch.exp(shower) - self.alpha
-            E_transformed = torch.exp(energy) if self.include_E else energy
         else:
             transformed = torch.log(shower + self.alpha)
-            E_transformed = torch.log(energy) if self.include_E else energy
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions]
-        
-        return transformed, E_transformed
+        return transformed, energy
 
+
+class ExclusiveLogitTransform(object):
+    """
+    Take log of input data
+        delta: regularization
+        exclusions: list of indices for features that should not be transformed
+    """
+
+    def __init__(self, delta, exclusions=None):
+        self.delta = delta
+        self.exclusions = exclusions
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = torch.special.expit(shower)
+        else:
+            transformed = torch.special.logit(shower, eps=self.delta)
+        if self.exclusions is not None:
+            transformed[..., self.exclusions] = shower[..., self.exclusions]            
+        return transformed, energy
+
+# Depracated
 class SelectiveLogitTransform(object):
     """
     Take log of input data
@@ -139,7 +208,7 @@ class SelectiveLogitTransform(object):
             transformed[..., self.inclusions] = torch.special.logit(
                 shower[..., self.inclusions], eps=self.delta
             )
-        return transformed, energy     
+        return transformed, energy
 
 class AddNoise(object):
     """
@@ -162,6 +231,44 @@ class AddNoise(object):
         else:
             noise = self.func.sample(shower.shape)*self.noise_width
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
+        return transformed, energy
+
+
+class SmoothUPeaks(object):
+    """
+    Smooth voxels equal to 0 or 1 using uniform noise
+        w0: noise width for zeros
+        w1: noise width for ones
+        eps: threshold below which values are considered zero
+    """
+
+    def __init__(self, w0, w1, eps=1.e-10):
+        self.func = torch.distributions.Uniform(
+            torch.tensor(0.0), torch.tensor(1.0))
+        self.w0 = w0
+        self.w1 = w1
+        self.scale = 1 + w0 + w1
+        self.eps = eps
+
+    def __call__(self, u, energy, rev=False):
+        if rev:
+            # undo scaling
+            transformed = u*self.scale - self.w0
+            # clip to [0, 1]
+            transformed = torch.clip(transformed, min=0., max=1.)
+            # restore u0
+            transformed[:, 0] = u[:, 0]
+        else:
+            # sample noise values
+            n0 = self.w0*self.func.sample(u.shape).to(u.device)
+            n1 = self.w1*self.func.sample(u.shape).to(u.device)
+            # add noise to us
+            transformed = u - n0*(u<=self.eps) + n1*(u>=1-self.eps)
+            # scale to [0,1] in preparation for logit
+            transformed = (transformed + self.w0)/self.scale
+            # restore u0
+            transformed[:, 0] = u[:, 0]
+            
         return transformed, energy
 
 class SelectiveUniformNoise(object):

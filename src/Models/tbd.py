@@ -24,7 +24,6 @@ class TBD(GenerativeModel):
         except AttributeError:
             raise NotImplementedError(f"build_model: Trajectory type {trajectory} not implemented")
 
-
         self.C = get(self.params, "C", 1)
         if self.C != 1:
             print(f"C is {self.C}")
@@ -52,10 +51,11 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        x = input[0].clone()
+        # x = input[0].clone()
         condition = input[1]
         weights = None
-        return x, condition, weights
+        # return x, condition, weights
+        return input[0], condition, weights
 
     def batch_loss(self, x):
         """
@@ -63,16 +63,17 @@ class TBD(GenerativeModel):
         """
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
-        #x = x[:,:10]
-        t = self.distribution.sample((x.size(0),1)).to(x.device)
+        
+        # t = self.distribution.sample((x.size(0),1)).to(x.device)
+        t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
         if self.add_noise:
             x = x + self.gamma * torch.randn_like(x, device=x.device, dtype=x.dtype)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
-        drift = self.net(x_t, t, condition)
+        drift = self.net(x_t, t.view(-1, 1), condition)
 
-        loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
+        loss = torch.mean((drift - x_t_dot) ** 2)#* torch.exp(self.t_factor * t)) ?
         # self.regular_loss.append(loss.detach().cpu().numpy())
         # if self.C != 0:
             # kl_loss = self.C*self.net.kl / self.n_traindata
@@ -86,44 +87,51 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        batch = batch[:, None]
+        # batch = batch[:, None] # moved to before sample_batch call
         dtype = batch.dtype
         device = batch.device
 
         x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # print(x_t.shape)
+            # print(t_torch.shape)
+            # print(batch.shape)
+            t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
             v = self.net(x_t, t_torch, batch)
 
             return v
-
-        events = []
 
         with torch.no_grad():
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
 
-            try:
-                x_t = solver(function,
-                             x_T,
-                             torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                             atol=1.e-6,
-                             rtol=1.e-3,
-                             ).detach().cpu().numpy()
-            except AssertionError:
-                print(f"failed ode try")
-                x_t = solver(function,
-                             x_T,
-                             torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                             atol=1.e-6,
-                             rtol=1.e-3,
-                             method='rk4',
-                             options={"step_size": 0.01}
-                             ).detach().cpu().numpy()
+            # try:
+            #     x_t = solver(function,
+            #                  x_T,
+            #                  torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+            #                  atol=1.e-6,
+            #                  rtol=1.e-3,
+            #                  ).detach().cpu().numpy()
+            # except AssertionError:
+            #     print(f"failed ode try")
+            #     x_t = solver(function,
+            #                  x_T,
+            #                  torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+            #                  atol=1.e-6,
+            #                  rtol=1.e-3,
+            #                  method='rk4',
+            #                  options={"step_size": 0.01}
+            #                  ).detach().cpu().numpy()
 
-            events.append(x_t[-1])
-        return np.concatenate(events, axis=0)
+            x_t = solver(
+                function, x_T,
+                torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                **self.params.get("solver_kwargs", {})
+            )
+            
+        return x_t[-1]
 
     def invert_n(self, samples):
         """
