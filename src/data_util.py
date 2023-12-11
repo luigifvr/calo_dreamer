@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import torch
+import gc
 
 from torch.utils.data import DataLoader
 #from myDataLoader import MyDataLoader
@@ -439,10 +440,12 @@ def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
     train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
                     val_frac=val_frac, transform=transforms, split='training', device=device,
                     single_energy=single_energy)
+    
+    
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
                     val_frac=val_frac, transform=transforms, split='validation', device=device,
                     single_energy=single_energy)
-
+    
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
 

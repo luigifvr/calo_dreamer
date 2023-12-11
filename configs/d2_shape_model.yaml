@@ -13,6 +13,7 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
+eval_cut: 15.15e-3
 shape: [1, 45, 16, 9]
 
 transforms: {

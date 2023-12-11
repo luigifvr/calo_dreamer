@@ -431,8 +431,8 @@ class GenerativeModel(nn.Module):
             self.save_sample(samples, conditions, name=name)
             script_args = (
                 f"-i {self.doc.basedir}/samples{name}.hdf5 "
-                f"-r {self.params['eval_hdf5_file']} -m all --cut 0.0 "
-                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/epoch_{name}/"
+                f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
             ) + (f" --energy {energy}" if energy is not None else '')
             evaluate.main(script_args.split())
 
