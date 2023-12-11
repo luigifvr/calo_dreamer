@@ -13,6 +13,7 @@ import sys
 from Util.util import *
 from data_util import get_loaders
 from datasets import CaloChallengeDataset
+from documenter import Documenter
 from plotting_util import *
 from transforms import *
 from challenge_files import *
@@ -78,7 +79,7 @@ class GenerativeModel(nn.Module):
         self.validate_every = get(self.params, "validate_every", 50)
 
         # init preprocessing
-        self.transforms = get_transformations(params.get('transforms', None))
+        self.transforms = get_transformations(params.get('transforms', None), doc=self.doc)
 
     def build_net(self):
         pass
@@ -470,9 +471,8 @@ class GenerativeModel(nn.Module):
 
         with open(os.path.join(model_dir, 'params.yaml')) as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
-
-        other = self.__class__(params, self.device, None) # or maybe self.__class__.__init__?
-        # other.net = other.build_net()
+        doc = Documenter(None, existing_run=model_dir, read_only=True)
+        other = self.__class__(params, self.device, doc)
         state_dicts = torch.load(os.path.join(model_dir, 'model.pt'), map_location=self.device)
         other.net.load_state_dict(state_dicts["net"])
         

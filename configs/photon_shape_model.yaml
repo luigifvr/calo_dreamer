@@ -13,7 +13,7 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: photon
 eval_dataset: '1-photons'
-eval_cut: 1.e-3
+eval_cut: 1.
 
 transforms: {
     NormalizeByElayer: {
@@ -21,17 +21,8 @@ transforms: {
         xml_file: photon
     },
     SelectiveUniformNoise: {noise_width: 5.0e-6, cut: True, exclusions: [-5, -4, -3, -2, -1]},
-    SelectiveLogTransform: {
-        alpha: 1.0e-6, exclusions: [-5, -4, -3, -2, -1]
-    },
-    SelectiveLogitTransform: {
-        delta: 1.0e-6, inclusions: [-4, -3, -2, -1]
-    },
-    StandardizeFromFile: {
-        mean_path: /home/aore/calo_dreamer/dat/means_1_photons_1.npy,
-        std_path: /home/aore/calo_dreamer/dat/stds_1_photons_1.npy,
-        create: True
-    },
+    ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-5]},
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 5.545177, e_max: 15.249238},
     AddFeaturesToCond: {split_index: 368}

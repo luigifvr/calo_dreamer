@@ -1,9 +1,9 @@
 import torch
 import numpy as np
+import os
 
 from challenge_files import *
 from challenge_files import XMLHandler
-from scipy.special import logit, expit
 
 class Standardize(object):
     """
@@ -30,20 +30,19 @@ class StandardizeFromFile(object):
         create: whether or not to calculate and save mean/std based on first call
     """
 
-    def __init__(self, mean_path, std_path, create=False):
-        self.mean_path = mean_path
-        self.std_path = std_path
-        self.create = create
+    def __init__(self, model_dir):
+
+        self.model_dir = model_dir
+        self.mean_path = os.path.join(model_dir, 'means.npy')
+        self.std_path = os.path.join(model_dir, 'stds.npy')
+        self.dtype = torch.get_default_dtype()
         try:
             # load from file
-            self.mean = torch.from_numpy(np.load(mean_path)).to(torch.get_default_dtype())
-            self.std = torch.from_numpy(np.load(std_path)).to(torch.get_default_dtype())
+            self.mean = torch.from_numpy(np.load(self.mean_path)).to(self.dtype)
+            self.std = torch.from_numpy(np.load(self.std_path)).to(self.dtype)
             self.written = True
-        except FileNotFoundError as e:
-            if create:
-                self.written = False
-            else:
-                raise e
+        except FileNotFoundError:
+            self.written = False
 
     def write(self, shower, energy):
         self.mean = shower.mean(axis=0)
@@ -56,7 +55,7 @@ class StandardizeFromFile(object):
         if rev:
             transformed = shower*self.std.to(shower.device) + self.mean.to(shower.device)
         else:
-            if self.create and not self.written:
+            if not self.written:
                 self.write(shower, energy)
             transformed = (shower - self.mean.to(shower.device))/self.std.to(shower.device)
         return transformed, energy
@@ -185,30 +184,7 @@ class ExclusiveLogitTransform(object):
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy
-
-# Depracated
-class SelectiveLogitTransform(object):
-    """
-    Take log of input data
-        delta: regularization
-        inclusions: list of indices for features that should be transformed
-    """
-    def __init__(self, delta, inclusions=None, include_E=False):
-        self.delta = delta
-        self.inclusions = inclusions
-
-    def __call__(self, shower, energy, rev=False):
-        if rev:
-            transformed = shower.clone()
-            transformed[..., self.inclusions] = torch.special.expit(
-                shower[..., self.inclusions]
-            )
-        else:
-            transformed = shower.clone()
-            transformed[..., self.inclusions] = torch.special.logit(
-                shower[..., self.inclusions], eps=self.delta
-            )
-        return transformed, energy
+    
 
 class AddNoise(object):
     """

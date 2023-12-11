@@ -18,14 +18,8 @@ transforms: {
         xml_file: photon
     },
     SelectDims: {start: -5, end: 0},
-    SelectiveLogitTransform: {
-        delta: 1.0e-6, inclusions: [-4, -3, -2, -1]
-    },
-    StandardizeFromFile: {
-        mean_path: /home/aore/calo_dreamer/dat/means_1_photons_1_us.npy,
-        std_path: /home/aore/calo_dreamer/dat/stds_1_photons_1_us.npy,
-        create: True
-    },
+    ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-5]},
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 5.545177, e_max: 15.249238},
 }

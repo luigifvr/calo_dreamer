@@ -31,11 +31,7 @@ transforms: {
                       -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1]
     },
     ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
-    StandardizeFromFile: {
-        mean_path: /home/aore/calo_dreamer/dat/means_2_1.npy,
-        std_path: /home/aore/calo_dreamer/dat/stds_2_1.npy,
-        create: True
-    },
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
