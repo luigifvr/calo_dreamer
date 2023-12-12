@@ -407,3 +407,31 @@ class NormalizeByElayer(object):
             transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
+
+class AddCoordChannels(object):
+    """
+    Add channel to image containing the coordinate value along particular
+    dimension. This breaks the translation symmetry of the convoluitons,
+    as discussed in arXiv:2308.03876
+
+        dims -- List of dimensions for which should have a coordinate channel
+                should be created.
+    """
+
+    def __init__(self, dims):
+        self.dims = dims
+
+    def __call__(self, shower, energy, rev=False):
+
+        if rev:
+            transformed = shower
+        else:
+            coords = []
+            for d in self.dims:
+                bcst_shp = [1] * shower.ndim
+                bcst_shp[d] = -1
+                size = shower.size(d)
+                coords.append(torch.ones_like(shower) / size *
+                              torch.arange(size).view(bcst_shp))
+            transformed = torch.cat([shower] + coords, dim=1)
+        return transformed, energy
