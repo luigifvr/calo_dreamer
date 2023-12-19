@@ -11,8 +11,7 @@ import sys
 
 # Other functions of project
 from Util.util import *
-from data_util import get_loaders
-from datasets import CaloChallengeDataset
+from datasets import *
 from documenter import Documenter
 from plotting_util import *
 from transforms import *
