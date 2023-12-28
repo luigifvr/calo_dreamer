@@ -379,7 +379,6 @@ class GenerativeModel(nn.Module):
     def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
-        conditions = torch.from_numpy(conditions)
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(

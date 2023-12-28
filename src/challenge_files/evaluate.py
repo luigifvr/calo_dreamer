@@ -157,8 +157,10 @@ class DNN(torch.nn.Module):
         x = self.layers(x)
         return x
 
-def prepare_low_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, normed=False, single_energy=None):
+def prepare_low_data_for_classifier(voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, normed=False, single_energy=None):
     """ takes hdf5_file, extracts Einc and voxel energies, appends label, returns array """
+    voxel = voxel_orig.clone()
+    E_inc = E_inc_orig.clone()
     if normed:
         E_norm_rep = []
         E_norm = []
@@ -168,11 +170,6 @@ def prepare_low_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, normed
             E_norm.append(hlf_class.GetElayers()[layer_id].reshape(-1, 1))
         E_norm_rep = np.concatenate(E_norm_rep, axis=1)
         E_norm = np.concatenate(E_norm, axis=1)
-    voxel, E_inc = extract_shower_and_energy(hdf5_file, label, single_energy=single_energy)
-
-    np.nan_to_num(voxel, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    voxel[voxel<cut] = 0.0
     if normed:
         voxel = voxel / (E_norm_rep+1e-16)
         ret = np.concatenate([np.log10(E_inc), voxel, np.log10(E_norm+1e-8),
@@ -182,10 +179,9 @@ def prepare_low_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, normed
         ret = np.concatenate([np.log10(E_inc), voxel, label*np.ones_like(E_inc)], axis=1)
     return ret
 
-def prepare_high_data_for_classifier(hdf5_file, hlf_class, label, cut=0.0, single_energy=None):
+def prepare_high_data_for_classifier(voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, single_energy=None):
     """ takes hdf5_file, extracts high-level features, appends label, returns array """
-    voxel, E_inc = extract_shower_and_energy(hdf5_file, label, single_energy=single_energy)
-    voxel[voxel<cut] = 0.0
+    E_inc = E_inc_orig.clone()
     E_tot = hlf_class.GetEtot()
     E_layer = []
     for layer_id in hlf_class.GetElayers():
@@ -441,7 +437,7 @@ def plot_histograms(hlf_class, reference_class, arg):
 class args_class:
     def __init__(self, params):
         self.dataset = params.get("eval_dataset")
-        self.mode = params.get("eval_mode", "hist")
+        self.mode = params.get("eval_mode", "cls-low")
         self.cut = params.get("eval_cut", 0.015)
         self.energy = params.get("eval_energy", None)
         self.reference_file = params.get("eval_hdf5_file")
