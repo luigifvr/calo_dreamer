@@ -357,44 +357,29 @@ class GenerativeModel(nn.Module):
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
         )
-        
         if self.params['model_type'] == 'shape': # sample u_i's if self is a shape model
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
             # sample us
-            u_samples = torch.vstack([
+            u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ])          
-
-            # # post-process u-samples according to energy config
-            # dummy = torch.empty(1, 1)
-            # for fn in energy_model.transforms[:0:-1]: # skip NormalizeByElayer
-            #     u_samples, dummy = fn(u_samples, dummy, rev=True)
-            
-            # # pre-process u-samples according to shape config
-            # # TODO: Is there a cleaner way to do this but without instantiating voxel-sized tensor?
-            # for fn in self.transforms:
-            #     if fn.__class__.__name__ == 'ExclusiveLogitTransform':
-            #         u_samples, dummy = fn(u_samples, dummy)
-            #     elif fn.__class__.__name__ == 'StandardizeFromFile':
-            #         u_samples *= fn.std[-u_samples.shape[1]:].to(self.device)
-            #         u_samples += fn.mean[-u_samples.shape[1]:].to(self.device)
-
+            ])).to(self.device)
             transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             transformed_cond_loader = DataLoader(
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        return sample, transformed_cond
+        return sample, transformed_cond.detach().cpu()  
 
     def sample_batch(self, batch):
         pass
 
     def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
-        # samples = torch.from_numpy(samples) # since transforms expect torch.tensor
+        samples = torch.from_numpy(samples) # since transforms expect torch.tensor
+        conditions = torch.from_numpy(conditions)
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(
@@ -425,16 +410,25 @@ class GenerativeModel(nn.Module):
             for fn in transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
             
-            samples = samples.detach().cpu()
-            conditions = conditions.detach().cpu()
+            samples = samples.detach().cpu().numpy()
+            conditions = conditions.detach().cpu().numpy()
 
-            self.save_sample(samples, conditions, name=name)
-            script_args = (
-                f"-i {self.doc.basedir}/samples{name}.hdf5 "
-                f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
-                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
-            ) + (f" --energy {energy}" if energy is not None else '')
-            evaluate.main(script_args.split())
+            #self.save_sample(samples, conditions, name=name)
+            #script_args = (
+            #    f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            #    f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            #    f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+            #) + (f" --energy {energy}" if energy is not None else '')
+            #evaluate.main(script_args.split())
+            evaluate.run_from_py(samples, conditions, self.doc, self.params)
+
+    def plot_saved_samples(self, name="", energy=None):
+        script_args = (
+            f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+        ) + (f" --energy {energy}" if energy is not None else '')
+        evaluate.main(script_args.split())
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
