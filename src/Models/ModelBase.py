@@ -404,6 +404,12 @@ class GenerativeModel(nn.Module):
                 reference.detach().cpu().numpy(),
                 documenter=self.doc
             )
+            evaluate.eval_ui_dists(
+                samples.detach().cpu().numpy(),
+                reference.detach().cpu().numpy(),
+                documenter=self.doc,
+                params=self.params,
+            )
         else:
             # postprocess
             for fn in transforms[::-1]:

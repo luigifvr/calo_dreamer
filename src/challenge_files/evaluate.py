@@ -373,7 +373,6 @@ def calibrate_classifier(model, calibration_data, arg):
                                                                                       result_true)
     return iso_reg
 
-
 def check_file(given_file, arg, which=None):
     """ checks if the provided file has the expected structure based on the dataset """
     print("Checking if {} file has the correct form ...".format(
@@ -431,7 +430,64 @@ def plot_histograms(hlf_class, reference_class, arg):
     if arg.dataset[0] == '1':
         plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
 
+def eval_ui_dists(source_array, reference_array, documenter, params):
+    args = args_class(params)
+    args.output_dir = documenter.basedir + "/eval/"
+    
+    if not os.path.isdir(args.output_dir):
+        os.makedirs(args.output_dir)
 
+   
+    # add label in source array
+    source_array = np.concatenate((source_array, np.zeros(source_array.shape[0]).reshape(-1, 1)), axis=1)
+    reference_array = np.concatenate((reference_array, np.ones(reference_array.shape[0]).reshape(-1, 1)), axis=1)
+    train_data, test_data, val_data = ttv_split(source_array, reference_array)
+
+    # set up device
+    args.device = torch.device('cuda:'+str(args.which_cuda) \
+                                   if torch.cuda.is_available() else 'cpu')
+    print("Using {}".format(args.device))
+
+    # set up DNN classifier
+    input_dim = train_data.shape[1]-1
+    DNN_kwargs = {'num_layer':args.cls_n_layer, # 2
+                  'num_hidden':args.cls_n_hidden, # 512
+                  'input_dim':input_dim,
+                  'dropout_probability':args.cls_dropout_probability} # 0
+    classifier = DNN(**DNN_kwargs)
+    classifier.to(args.device)
+    print(classifier)
+    total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
+
+    print("{} has {} parameters".format(args.mode, int(total_parameters)))
+
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
+
+    train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device))
+    test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device))
+    val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device))
+
+    train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
+    val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
+
+    train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
+    classifier = load_classifier(classifier, args)
+
+    with torch.no_grad():
+        print("Now looking at independent dataset:")
+        eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
+                                                    final_eval=True,
+                                                    calibration_data=test_dataloader)
+    print("Final result of classifier test (AUC / JSD):")
+    print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+    with open(os.path.join(args.output_dir, 'classifier_{}_{}.txt'.format(args.mode,
+                                                                        args.dataset)),
+            'a') as f:
+        f.write('Final result of classifier test (AUC / JSD):\n'+\
+                '{:.4f} / {:.4f}\n\n'.format(eval_auc, eval_JSD))
+
+   
 ########## Alternative Main ############
 
 class args_class:
@@ -441,10 +497,15 @@ class args_class:
         self.cut = params.get("eval_cut", 0.015)
         self.energy = params.get("eval_energy", None)
         self.reference_file = params.get("eval_hdf5_file")
+        self.which_cuda = 0
 
         self.cls_n_layer = params.get("eval_cls_n_layer", 2)
         self.cls_n_hidden = params.get("eval_cls_n_hidden", 512)
         self.cls_dropout_probability = params.get("eval_cls_dropout", 0.0)
+        self.cls_lr = params.get("eval_cls_lr", 2.e-4)
+        self.cls_batch_size = params.get("eval_cls_batch_size", 1000)
+        self.cls_n_epochs = params.get("eval_cls_n_epochs", 100)
+        self.save_mem = params.get("eval_cls_save_mem", False)
 
 def run_from_py(sample, energy, doc, params):
     print("Running evaluation script run_from_py:")
@@ -859,18 +920,18 @@ def main(raw_args=None):
         print("Calculating high-level features for classifer: DONE.\n")
 
         if args.mode in ['all', 'cls-low']:
-            source_array = prepare_low_data_for_classifier(source_file, hlf, 0., cut=cut,
+            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
                                                            normed=False, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_file, reference_hlf, 1., cut=cut,
+            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                               normed=False, single_energy=args.energy)
         elif args.mode in ['cls-low-normed']:
-            source_array = prepare_low_data_for_classifier(source_file, hlf, 0., cut=cut,
+            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
                                                            normed=True, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_file, reference_hlf, 1., cut=cut,
+            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                               normed=True, single_energy=args.energy)
         elif args.mode in ['cls-high']:
-            source_array = prepare_high_data_for_classifier(source_file, hlf, 0., cut=cut, single_energy=args.energy)
-            reference_array = prepare_high_data_for_classifier(reference_file, reference_hlf, 1., cut=cut,
+            source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0., cut=cut, single_energy=args.energy)
+            reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                                 single_energy=args.energy)
 
         train_data, test_data, val_data = ttv_split(source_array, reference_array)
