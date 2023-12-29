@@ -6,7 +6,7 @@ from matplotlib import gridspec
 
 dup = lambda a: np.append(a, a[-1])
 
-def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0, 2), num_bins=64, color='fuchsia', quantile_bins=False, skip_quantiles=0, documenter=None):
+def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num_bins=64, color='fuchsia', quantile_bins=False, skip_quantiles=0, documenter=None):
 
     # setup figure
     for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):

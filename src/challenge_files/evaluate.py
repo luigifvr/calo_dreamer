@@ -159,8 +159,8 @@ class DNN(torch.nn.Module):
 
 def prepare_low_data_for_classifier(voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, normed=False, single_energy=None):
     """ takes hdf5_file, extracts Einc and voxel energies, appends label, returns array """
-    voxel = voxel_orig.clone()
-    E_inc = E_inc_orig.clone()
+    voxel = voxel_orig.copy()
+    E_inc = E_inc_orig.copy()
     if normed:
         E_norm_rep = []
         E_norm = []
@@ -181,7 +181,7 @@ def prepare_low_data_for_classifier(voxel_orig, E_inc_orig, hlf_class, label, cu
 
 def prepare_high_data_for_classifier(voxel_orig, E_inc_orig, hlf_class, label, cut=0.0, single_energy=None):
     """ takes hdf5_file, extracts high-level features, appends label, returns array """
-    E_inc = E_inc_orig.clone()
+    E_inc = E_inc_orig.copy()
     E_tot = hlf_class.GetEtot()
     E_layer = []
     for layer_id in hlf_class.GetElayers():
@@ -920,17 +920,17 @@ def main(raw_args=None):
         print("Calculating high-level features for classifer: DONE.\n")
 
         if args.mode in ['all', 'cls-low']:
-            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
+            source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
                                                            normed=False, single_energy=args.energy)
             reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                               normed=False, single_energy=args.energy)
         elif args.mode in ['cls-low-normed']:
-            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
+            source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
                                                            normed=True, single_energy=args.energy)
             reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                               normed=True, single_energy=args.energy)
         elif args.mode in ['cls-high']:
-            source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0., cut=cut, single_energy=args.energy)
+            source_array = prepare_high_data_for_classifier(shower, energy, hlf, 0., cut=cut, single_energy=args.energy)
             reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
                                                                 single_energy=args.energy)
 
