@@ -1,3 +1,4 @@
+import torch
 import torch.optim
 import torch.utils.data
 import yaml
@@ -57,7 +58,6 @@ def get_device():
     use_cuda = torch.cuda.is_available()
     device = "cuda" if use_cuda else "cpu"
     return device
-
 
 def linear_beta_schedule(timesteps):
     """

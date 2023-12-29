@@ -5,6 +5,15 @@ import os
 from challenge_files import *
 from challenge_files import XMLHandler
 
+def logit_trafo(array, alpha=1.e-6, inv=False):
+    if inv:
+        z = torch.sigmoid(array)
+        z = (z-alpha)/(1-2*alpha)
+    else:
+        z = array*(1-2*alpha) + alpha
+        z = torch.logit(z)
+    return z
+
 class Standardize(object):
     """
     Standardize features 
@@ -164,7 +173,26 @@ class SelectiveLogTransform(object):
             transformed[..., self.exclusions] = shower[..., self.exclusions]
         return transformed, energy
 
+class ExclusiveLogTransform(object):
+    """
+    Take log of input data
+        delta: regularization
+        exclusions: list of indices for features that should not be transformed
+    """
 
+    def __init__(self, delta, exclusions=None):
+        self.delta = delta
+        self.exclusions = exclusions
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = torch.exp(shower) - self.delta
+        else:
+            transformed = torch.log(shower + self.delta)
+        if self.exclusions is not None:
+            transformed[..., self.exclusions] = shower[..., self.exclusions] 
+        return transformed, energy
+ 
 class ExclusiveLogitTransform(object):
     """
     Take log of input data
@@ -178,9 +206,9 @@ class ExclusiveLogitTransform(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = torch.special.expit(shower)
+            transformed = logit_trafo(shower, alpha=self.delta, inv=True)
         else:
-            transformed = torch.special.logit(shower, eps=self.delta)
+            transformed = logit_trafo(shower, alpha=self.delta, inv=False)
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy
