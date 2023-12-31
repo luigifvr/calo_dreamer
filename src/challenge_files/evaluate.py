@@ -493,7 +493,7 @@ def eval_ui_dists(source_array, reference_array, documenter, params):
 class args_class:
     def __init__(self, params):
         self.dataset = params.get("eval_dataset")
-        self.mode = params.get("eval_mode", "cls-low")
+        self.mode = params.get("eval_mode", "all")
         self.cut = params.get("eval_cut", 0.015)
         self.energy = params.get("eval_energy", None)
         self.reference_file = params.get("eval_hdf5_file")
@@ -688,7 +688,7 @@ def run_from_py(sample, energy, doc, params):
 
         # set up device
         args.device = torch.device('cuda:'+str(args.which_cuda) \
-                                   if torch.cuda.is_available() and not args.no_cuda else 'cpu')
+                                   if torch.cuda.is_available() else 'cpu')
         print("Using {}".format(args.device))
 
         # set up DNN classifier

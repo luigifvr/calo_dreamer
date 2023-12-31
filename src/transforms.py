@@ -206,9 +206,11 @@ class ExclusiveLogitTransform(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = logit_trafo(shower, alpha=self.delta, inv=True)
+            transformed = torch.special.expit(shower)
+            #transformed = logit_trafo(shower, alpha=self.delta, inv=True)
         else:
-            transformed = logit_trafo(shower, alpha=self.delta, inv=False)
+            transformed = torch.special.logit(shower, eps=self.delta)
+            #transformed = logit_trafo(shower, alpha=self.delta, inv=False)
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy

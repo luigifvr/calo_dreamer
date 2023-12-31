@@ -418,7 +418,7 @@ class GenerativeModel(nn.Module):
             samples = samples.detach().cpu().numpy()
             conditions = conditions.detach().cpu().numpy()
 
-            #self.save_sample(samples, conditions, name=name)
+            self.save_sample(samples, conditions, name=name)
             #script_args = (
             #    f"-i {self.doc.basedir}/samples{name}.hdf5 "
             #    f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
