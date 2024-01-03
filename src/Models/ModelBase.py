@@ -222,8 +222,8 @@ class GenerativeModel(nn.Module):
                     # samples = np.concatenate(bay_samples)
 
                     samples, c = self.sample_n()
-                    self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.params['single_energy'])
-                    # self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.params['single_energy'])
+                    self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy)
+                    # self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -254,7 +254,7 @@ class GenerativeModel(nn.Module):
             sampling_time = t_1 - t_0
             self.params["sampling_time"] = sampling_time
             print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
-            self.plot_samples(samples=samples, conditions=c, energy=self.params['single_energy'])
+            self.plot_samples(samples=samples, conditions=c, energy=self.single_energy)
 
     def train_one_epoch(self):
         # create list to save train_loss
@@ -331,6 +331,9 @@ class GenerativeModel(nn.Module):
         return ret
 
     def sample_n(self):
+
+        self.eval()
+
         if self.net.bayesian:
             self.net.map = get(self.params, "fix_mu", False)
             for bay_layer in self.net.bayesian_layers:
@@ -362,6 +365,7 @@ class GenerativeModel(nn.Module):
         if self.params['model_type'] == 'shape': # sample u_i's if self is a shape model
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
+            energy_model.eval()
             # sample us
             u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
