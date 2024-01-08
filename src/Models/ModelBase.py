@@ -382,8 +382,8 @@ class GenerativeModel(nn.Module):
             #     if fn.__class__.__name__ == 'ExclusiveLogitTransform':
             #         u_samples, dummy = fn(u_samples, dummy)
             #     elif fn.__class__.__name__ == 'StandardizeFromFile':
-            #         u_samples *= fn.std[-u_samples.shape[1]:].to(self.device)
-            #         u_samples += fn.mean[-u_samples.shape[1]:].to(self.device)
+            #         u_samples -= fn.mean[-u_samples.shape[1]:].to(self.device)
+            #         u_samples /= fn.std[-u_samples.shape[1]:].to(self.device)
 
             transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             transformed_cond_loader = DataLoader(
