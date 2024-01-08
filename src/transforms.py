@@ -264,6 +264,8 @@ class SelectiveUniformNoise(object):
     def __call__(self, shower, energy, rev=False):
         if rev:
             mask = (shower < self.noise_width)
+            if self.exclusions:
+                mask[:, self.exclusions] = False
             transformed = shower
             if self.cut:
                 transformed[mask] = 0.0 
@@ -424,7 +426,7 @@ class AddCoordChannels(object):
     def __call__(self, shower, energy, rev=False):
 
         if rev:
-            transformed = shower
+            transformed = shower # generated shower already only has 1 channel
         else:
             coords = []
             for d in self.dims:

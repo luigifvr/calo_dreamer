@@ -107,6 +107,7 @@ class TBD(GenerativeModel):
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
 
+            # TODO: reimplement check for failure of adaptive solve
             # try:
             #     x_t = solver(function,
             #                  x_T,

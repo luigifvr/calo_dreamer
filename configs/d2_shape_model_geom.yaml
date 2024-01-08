@@ -1,4 +1,4 @@
-run_name: d2_2000_epoch_shape_model
+run_name: d2_2000_epoch_shape_model_geom
 dtype: float32
 
 # Model
@@ -35,7 +35,7 @@ transforms: {
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
+    Reshape: {shape: [1, 45, 16, 9]},
 }
 
 # Training
@@ -59,8 +59,10 @@ sample_every_n_samples: 1001
 solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
 
 # Network
-network: UNet
+network: CylindricalUNet
 condition_dim: 46
+in_channels: 1
+break_dims: [2, 4]
 level_channels: [32, 64, 128]
 encode_t: True
 encode_t_dim: 100
