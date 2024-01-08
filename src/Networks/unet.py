@@ -136,12 +136,16 @@ class Conv3DBlock(nn.Module):
     :param in_channels -> number of input channels
     :param out_channels -> desired number of output channels
     :param bottleneck -> specifies the bottlneck block
+    :param downsamp_kernel -> kernel in max pooling
+    :param downsamp_stride -> stride in max pooling
+    :param downsamp_padding -> padding in max pooling
     -- forward()
     :param input -> input Tensor to be convolved
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, cond_dim=None, bottleneck=False):
+    def __init__(self, in_channels, out_channels, cond_dim=None, bottleneck=False,
+                 downsamp_kernel=(3,3,3), downsamp_stride=(3,3,3), downsamp_padding=(1,1,1)):
         super(Conv3DBlock, self).__init__()
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
@@ -158,7 +162,7 @@ class Conv3DBlock(nn.Module):
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(kernel_size=(3, 2, 3), stride=(3, 2, 3))
+            self.pooling = nn.MaxPool3d(kernel_size=downsamp_kernel, stride=downsamp_stride, padding=downsamp_padding) 
 
     def forward(self, input, condition=None):
 
@@ -189,7 +193,8 @@ class UpConv3DBlock(nn.Module):
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, num_classes=None):
+    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, num_classes=None,
+                 upsamp_kernel=(3,3,3), upsamp_stride=(3,3,3), upsamp_padding=(1,1,1)):
         super(UpConv3DBlock, self).__init__()
         assert (last_layer == False and num_classes == None) or (
             last_layer == True and num_classes != None), 'Invalid arguments'
@@ -250,6 +255,9 @@ class UNet(nn.Module):
                   encode_t_dim -- Dimension of the condition embedding            
                   activation -- Activation function for hidden layers
                   output_activation -- Activation function for output layer
+                  kernel_size -- Kernel size in downsampling and upsampling blocks
+                  stride -- Stride in downsampling and upsampling blocks
+                  padding -- Padding (both sides) in downsampling and upsampling blocks
                   bayesian -- Whether or not to use bayesian layers
     """
 
@@ -269,6 +277,9 @@ class UNet(nn.Module):
             'encode_c_dim': 32,
             'activation': nn.SiLU(),
             'output_activation': None,
+            'kernel_size': [3,2,3],
+            'stride': [3,2,3],
+            'padding': [0,1,0],
             'bayesian': False
         }
             
@@ -293,24 +304,29 @@ class UNet(nn.Module):
         level_1_chnls, level_2_chnls, bottleneck_chnl = self.level_channels
         self.a_block1 = Conv3DBlock(
             in_channels=self.in_channels, out_channels=level_1_chnls,
-            cond_dim=self.total_condition_dim
+            cond_dim=self.total_condition_dim, downsamp_kernel=self.kernel_size,
+            downsamp_stride=self.stride, downsamp_padding=self.padding
         )
         self.a_block2 = Conv3DBlock(
             in_channels=level_1_chnls, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim
+            cond_dim=self.total_condition_dim, downsamp_kernel=self.kernel_size,
+            downsamp_stride=self.stride, downsamp_padding=self.padding
         )
         self.bottleNeck = Conv3DBlock(
             in_channels=level_2_chnls, out_channels=bottleneck_chnl,
-            bottleneck=True, cond_dim=self.total_condition_dim
+            bottleneck=True, cond_dim=self.total_condition_dim, downsamp_kernel=self.kernel_size,
+            downsamp_stride=self.stride, downsamp_padding=self.padding
         )
         self.s_block2 = UpConv3DBlock(
             in_channels=bottleneck_chnl, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim
+            cond_dim=self.total_condition_dim, upsamp_kernel=self.kernel_size,
+            upsamp_stride=self.stride, upsamp_padding=self.padding
         )
         self.s_block1 = UpConv3DBlock(
             in_channels=level_2_chnls, out_channels=level_1_chnls,
             num_classes=self.out_channels, cond_dim=self.total_condition_dim,
-            last_layer=True
+            last_layer=True, upsamp_kernel=self.kernel_size,
+            upsamp_stride=self.stride, upsamp_padding=self.padding
         )
         self.kl = torch.zeros(())
         

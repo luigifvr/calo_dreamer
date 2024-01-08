@@ -11,8 +11,7 @@ import sys
 
 # Other functions of project
 from Util.util import *
-from data_util import get_loaders
-from datasets import CaloChallengeDataset
+from datasets import *
 from documenter import Documenter
 from plotting_util import *
 from transforms import *
@@ -223,7 +222,6 @@ class GenerativeModel(nn.Module):
 
                     samples, c = self.sample_n()
                     self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy)
-                    # self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -361,15 +359,14 @@ class GenerativeModel(nn.Module):
         transformed_cond_loader = DataLoader(
             dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
         )
-        
         if self.params['model_type'] == 'shape': # sample u_i's if self is a shape model
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
             energy_model.eval()
             # sample us
-            u_samples = torch.vstack([
+            u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ])          
+            ])).to(self.device)
 
             # # post-process u-samples according to energy config
             # dummy = torch.empty(1, 1)
@@ -390,16 +387,16 @@ class GenerativeModel(nn.Module):
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        return sample, transformed_cond
+        return sample, transformed_cond.detach().cpu()  
 
     def sample_batch(self, batch):
         pass
 
     def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
-        # samples = torch.from_numpy(samples) # since transforms expect torch.tensor
+        samples = torch.from_numpy(samples) # since transforms expect torch.tensor
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(
@@ -425,21 +422,36 @@ class GenerativeModel(nn.Module):
                 reference.detach().cpu().numpy(),
                 documenter=self.doc
             )
+            evaluate.eval_ui_dists(
+                samples.detach().cpu().numpy(),
+                reference.detach().cpu().numpy(),
+                documenter=self.doc,
+                params=self.params,
+            )
         else:
             # postprocess
             for fn in transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
             
-            samples = samples.detach().cpu()
-            conditions = conditions.detach().cpu()
+            samples = samples.detach().cpu().numpy()
+            conditions = conditions.detach().cpu().numpy()
 
             self.save_sample(samples, conditions, name=name)
-            script_args = (
-                f"-i {self.doc.basedir}/samples{name}.hdf5 "
-                f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
-                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
-            ) + (f" --energy {energy}" if energy is not None else '')
-            evaluate.main(script_args.split())
+            #script_args = (
+            #    f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            #    f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            #    f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+            #) + (f" --energy {energy}" if energy is not None else '')
+            #evaluate.main(script_args.split())
+            evaluate.run_from_py(samples, conditions, self.doc, self.params)
+
+    def plot_saved_samples(self, name="", energy=None):
+        script_args = (
+            f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+        ) + (f" --energy {energy}" if energy is not None else '')
+        evaluate.main(script_args.split())
 
     def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
