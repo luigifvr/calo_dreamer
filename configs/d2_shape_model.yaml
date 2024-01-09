@@ -3,7 +3,7 @@ dtype: float32
 
 # Model
 model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
+energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
 
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
@@ -62,6 +62,9 @@ solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
 network: UNet
 condition_dim: 46
 level_channels: [32, 64, 128]
+level_kernels: [[3,2,3], [3,2,3]]
+level_strides: [[3,2,3], [3,2,3]]
+level_pads: [0, 0]
 encode_t: True
 encode_t_dim: 100
 encode_c: True

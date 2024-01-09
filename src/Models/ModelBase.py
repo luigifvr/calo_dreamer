@@ -339,7 +339,6 @@ class GenerativeModel(nn.Module):
         sample = []
 
         Einc = torch.tensor(
-            # Ayo: TODO: Generalise number of samples to generate
             # Ayo: TODO: Handle single energy option for datasets 2 & 3
             10**np.random.uniform(3, 6, size=10**5) 
             if self.params['eval_dataset'] in ['2', '3'] else
@@ -363,10 +362,11 @@ class GenerativeModel(nn.Module):
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
             energy_model.eval()
+
             # sample us
-            u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
+            u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ])).to(self.device)
+            ]).to(self.device)
 
             # # post-process u-samples according to energy config
             # dummy = torch.empty(1, 1)
@@ -387,16 +387,16 @@ class GenerativeModel(nn.Module):
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        return sample, transformed_cond.detach().cpu()  
+        return sample, transformed_cond
 
     def sample_batch(self, batch):
         pass
 
     def plot_samples(self, samples, conditions, name="", energy=None):
+        
         transforms = self.transforms
-        samples = torch.from_numpy(samples) # since transforms expect torch.tensor
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(

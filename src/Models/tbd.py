@@ -132,7 +132,7 @@ class TBD(GenerativeModel):
                 **self.params.get("solver_kwargs", {})
             )
             
-        return x_t[-1]
+        return x_t[-1].detach().cpu()
 
     def invert_n(self, samples):
         """

@@ -1,2 +1,2 @@
 from .resnet import Resnet
-from .unet import SimpleUNet, UNet, PaddedUNet
+from .unet import UNet, CylindricalUNet
