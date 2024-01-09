@@ -389,7 +389,7 @@ class GenerativeModel(nn.Module):
                 
         sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        return sample, transformed_cond
+        return sample, transformed_cond.detach().cpu()
 
     def sample_batch(self, batch):
         pass

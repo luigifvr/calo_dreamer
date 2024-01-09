@@ -64,6 +64,9 @@ condition_dim: 46
 in_channels: 1
 break_dims: [2, 4]
 level_channels: [32, 64, 128]
+level_kernels: [[3,4,3], [3,3,3]]
+level_strides: [[3,2,3], [3,2,3]]
+level_pads: [2, 1]
 encode_t: True
 encode_t_dim: 100
 encode_c: True
