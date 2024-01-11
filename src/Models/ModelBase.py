@@ -247,7 +247,10 @@ class GenerativeModel(nn.Module):
         if get(self.params, "sample", True):
             print("generate_samples: Start generating samples", flush=True)
             t_0 = time.time()
-            samples, c = self.sample_n()
+            if get(self.params, "reconstruct", False):
+                samples, c = self.reconstruct_n()
+            else:
+                samples, c = self.sample_n()
             t_1 = time.time()
             sampling_time = t_1 - t_0
             self.params["sampling_time"] = sampling_time
@@ -390,6 +393,20 @@ class GenerativeModel(nn.Module):
         sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
         return sample, transformed_cond.detach().cpu()
+    
+    def reconstruct_n(self,):
+        recos = []
+        energies = []
+
+        self.net.eval()
+        for n, x in enumerate(self.train_loader):
+            reco, cond = self.sample_batch(x)
+            recos.append(reco)
+            energies.append(cond)
+
+        recos = torch.vstack(recos)
+        energies = torch.vstack(energies)
+        return recos, energies
 
     def sample_batch(self, batch):
         pass
