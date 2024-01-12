@@ -56,7 +56,8 @@ class Conv3DBlock(nn.Module):
 
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels, out_channels=out_channels,
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
 
