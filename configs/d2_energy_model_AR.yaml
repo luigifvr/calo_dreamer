@@ -38,8 +38,8 @@ use_scheduler: True
 lr_scheduler: CosineAnnealing
 #weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 5000
-cycle_epochs: 5000
+n_epochs: 1000
+cycle_epochs: 1000
 cycle_pct_start: 0.1
 save_interval: 100_001
 
