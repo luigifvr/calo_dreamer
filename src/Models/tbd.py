@@ -33,7 +33,7 @@ class TBD(GenerativeModel):
         self.t_max = get(self.params, "t_max", 1)
         self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
         self.add_noise = get(self.params, "add_noise", False)
-        self.alpha = get(self.params, "alpha", 1.e-4)
+        self.gamma = get(self.params, "gamma", 1.e-4)
 
 
     def build_net(self):
@@ -68,10 +68,7 @@ class TBD(GenerativeModel):
         t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
         if self.add_noise:
-            x = x + self.alpha * torch.randn_like(x, device=x.device, dtype=x.dtype)
-            condition = condition + self.alpha * torch.randn_like(condition, device=condition.device, dtype=condition.dtype)
-
-
+            x = x + self.gamma * torch.randn_like(x, device=x.device, dtype=x.dtype)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
         drift = self.net(x_t, t.view(-1, 1), condition)

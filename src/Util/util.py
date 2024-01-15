@@ -132,8 +132,10 @@ def get_energy_and_sorted_layers(data):
             
     return energy, layers
 
-def get_transformations(transforms_list):
+def get_transformations(transforms_list, doc=None):
     func = []
-    for key, params in transforms_list.items():
-        func.append(getattr(transforms, key)(**params))
+    for name, kwargs in transforms_list.items():
+        if name == 'StandardizeFromFile' and doc is not None:
+            kwargs['model_dir'] = doc.basedir
+        func.append(getattr(transforms, name)(**kwargs))
     return func
