@@ -125,10 +125,11 @@ class Conv3DBlock(nn.Module):
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, cond_dim=None, bottleneck=False):
+    def __init__(self, in_channels, out_channels, cond_dim=None, cond_layers=1, bottleneck=False):
         super(Conv3DBlock, self).__init__()
         self.out_channels = out_channels
-        self.cond_layer = nn.Linear(cond_dim, out_channels)
+        #self.cond_layer = nn.Linear(cond_dim, out_channels)
+        self.cond_block = self.make_condition_block(cond_dim=cond_dim,cond_layers=cond_layers)
         self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
@@ -138,11 +139,27 @@ class Conv3DBlock(nn.Module):
         if not bottleneck:
             self.pooling = nn.MaxPool3d(kernel_size=(3, 2, 3), stride=(3, 2, 3))
 
+    def make_condition_block(self, cond_dim, cond_layers):
+        # Use linear layers
+        linear = nn.Linear(cond_dim, cond_dim)
+        layers = [linear, nn.SiLU()]
+
+        for _ in range(1, cond_layers - 1):
+            linear = nn.Linear(cond_dim, cond_dim)
+            layers.append(linear)
+            layers.append(nn.SiLU())
+
+        linear = nn.Linear(cond_dim, self.out_channels)
+        layers.append(linear)
+
+        return nn.Sequential(*layers)
+
+
     def forward(self, input, condition=None):
 
         res = self.conv1(input)
         if condition is not None:
-            res = res + self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
+            res = res + self.cond_block(condition).view(-1, self.out_channels, 1, 1, 1)
         res = self.act(self.bn1(res))
         res = self.act(self.bn2(self.conv2(res)))
         out = None
@@ -167,12 +184,13 @@ class UpConv3DBlock(nn.Module):
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, num_classes=None):
+    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, cond_layers=1, num_classes=None):
         super(UpConv3DBlock, self).__init__()
         assert (last_layer == False and num_classes == None) or (
             last_layer == True and num_classes != None), 'Invalid arguments'
         self.out_channels = out_channels
-        self.cond_layer = nn.Linear(cond_dim, out_channels)
+        #self.cond_layer = nn.Linear(cond_dim, out_channels)
+        self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
         self.upconv1 = nn.ConvTranspose3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 2, 3), stride=(3, 2, 3))
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
@@ -182,6 +200,21 @@ class UpConv3DBlock(nn.Module):
         self.last_layer = last_layer
         if last_layer:
             self.conv3 = nn.Conv3d(in_channels=out_channels, out_channels=num_classes, kernel_size=(1, 1, 1))
+
+    def make_condition_block(self, cond_dim, cond_layers):
+        # Use linear layers
+        linear = nn.Linear(cond_dim, cond_dim)
+        layers = [linear, nn.SiLU()]
+
+        for _ in range(1, cond_layers - 1):
+            linear = nn.Linear(cond_dim, cond_dim)
+            layers.append(linear)
+            layers.append(nn.SiLU())
+
+        linear = nn.Linear(cond_dim, self.out_channels)
+        layers.append(linear)
+
+        return nn.Sequential(*layers)
 
     def forward(self, input, residual=None, condition=None):
 
@@ -193,7 +226,7 @@ class UpConv3DBlock(nn.Module):
             out = out + residual
         out = self.conv1(out)
         if condition is not None:
-            out = out + self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
+            out = out + self.cond_block(condition).view(-1, self.out_channels, 1, 1, 1)
         out = self.act(self.bn1(out))
         out = self.act(self.bn2(self.conv2(out)))
         if self.last_layer:
@@ -233,9 +266,10 @@ class UNet(nn.Module):
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
+            'cond_layers': 4,
             'activation': nn.SiLU(),
             'output_activation': None,
-            'bayesian': False
+            'bayesian': False,
         }
             
         for k, p in defaults.items():
@@ -259,24 +293,24 @@ class UNet(nn.Module):
         level_1_chnls, level_2_chnls, bottleneck_chnl = self.level_channels
         self.a_block1 = Conv3DBlock(
             in_channels=self.in_channels, out_channels=level_1_chnls,
-            cond_dim=self.total_condition_dim
-        )
+            cond_dim=self.total_condition_dim, cond_layers=self.cond_layers)
+
         self.a_block2 = Conv3DBlock(
             in_channels=level_1_chnls, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim
+            cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
         )
         self.bottleNeck = Conv3DBlock(
             in_channels=level_2_chnls, out_channels=bottleneck_chnl,
-            bottleneck=True, cond_dim=self.total_condition_dim
+            bottleneck=True, cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
         )
         self.s_block2 = UpConv3DBlock(
             in_channels=bottleneck_chnl, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim
+            cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
         )
         self.s_block1 = UpConv3DBlock(
             in_channels=level_2_chnls, out_channels=level_1_chnls,
             num_classes=self.out_channels, cond_dim=self.total_condition_dim,
-            last_layer=True
+            last_layer=True,cond_layers=self.cond_layers
         )
         self.kl = torch.zeros(())
         

@@ -7,6 +7,8 @@ import torch
 from documenter import Documenter
 from Models import *
 from Models.tbd import TBD
+import Models
+from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -43,7 +45,12 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params, device, doc)
+    model = params.get("model", "TBD")
+    try:
+        model = getattr(Models, model)(params, device, doc)
+    except AttributeError:
+        raise NotImplementedError(f"build_model: Network class {network} not recognised")
+
     if not args.plot:
         model.run_training()
     else:

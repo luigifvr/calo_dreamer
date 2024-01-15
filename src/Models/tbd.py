@@ -32,6 +32,8 @@ class TBD(GenerativeModel):
         self.t_min = get(self.params, "t_min", 0)
         self.t_max = get(self.params, "t_max", 1)
         self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
+        self.add_noise = get(self.params, "add_noise", False)
+        self.alpha = get(self.params, "alpha", 1.e-4)
 
 
     def build_net(self):
@@ -65,6 +67,11 @@ class TBD(GenerativeModel):
         # t = self.distribution.sample((x.size(0),1)).to(x.device)
         t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
+        if self.add_noise:
+            x = x + self.alpha * torch.randn_like(x, device=x.device, dtype=x.dtype)
+            condition = condition + self.alpha * torch.randn_like(condition, device=condition.device, dtype=condition.dtype)
+
+
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
         drift = self.net(x_t, t.view(-1, 1), condition)
@@ -99,17 +106,20 @@ class TBD(GenerativeModel):
 
             return v
 
+        events = []
+
         with torch.no_grad():
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
 
-            x_t = solver(
-                function, x_T,
-                torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                **self.params.get("solver_kwargs", {})
-            )
-            
-        return x_t[-1]
+            x_t = solver(function,
+                         x_T,
+                         torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                         **self.params.get("solver_kwargs", {})
+                         ).detach().cpu().numpy()
+
+            events.append(x_t[-1])
+        return np.concatenate(events, axis=0)
 
     def invert_n(self, samples):
         """

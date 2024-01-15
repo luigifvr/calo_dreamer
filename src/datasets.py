@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+import gc
 
 from torch.utils.data import Dataset, DataLoader
 from Util.util import *
@@ -25,27 +26,34 @@ class CaloChallengeDataset(Dataset):
         self.transform = transform
         self.device = device
         self.dtype = torch.get_default_dtype()
-        self.energy = torch.tensor(self.energy, dtype=self.dtype).to(device=self.device)
-        self.layers = torch.tensor(self.layers, dtype=self.dtype).to(device=self.device)
 
-        # apply preprocessing
+        self.energy = torch.tensor(self.energy, dtype=self.dtype)
+        self.layers = torch.tensor(self.layers, dtype=self.dtype)
+
+        # apply preprocessing and then move to GPU
         if self.transform:
             for fn in self.transform:
                 self.layers, self.energy = fn(self.layers, self.energy)
-        # self.energy = torch.log(self.energy/1e3)
-        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
 
+        val_size = int(len(self.energy)*val_frac)
+        trn_size = len(self.energy) - val_size
         # make train/val split
-        if split is not None:
-            val_size = int(len(self.energy)*val_frac)
-            trn_size = len(self.energy) - val_size
-            self.data = torch.utils.data.random_split(
-                torch.utils.data.TensorDataset(self.layers, self.energy),
-                [trn_size, val_size]
-            )[0 if split=='training' else 1 if split=='validation' else None]
-        
+        if split == 'training':
+            self.layers = self.layers[:trn_size]
+            self.energy = self.energy[:trn_size]
+        elif split == 'validation':
+            self.layers = self.layers[-val_size:]
+            self.energy = self.energy[-val_size:]
+
+        self.layers = self.layers.to(device)
+        self.energy = self.energy.to(device)
+
+        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
+        print("Device: ", self.energy.device)
+
+
     def __len__(self):
-        return len(self.data)
+        return len(self.energy)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.layers[idx], self.energy[idx]
