@@ -51,7 +51,7 @@ def main():
     try:
         model = getattr(Models, model)(params, device, doc)
     except AttributeError:
-        raise NotImplementedError(f"build_model: Network class {network} not recognised")
+        raise NotImplementedError(f"build_model: Model class {model} not recognised")
 
     if not args.plot:
         model.run_training()
