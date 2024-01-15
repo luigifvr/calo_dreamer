@@ -1,14 +1,14 @@
-run_name: d2_2000_epoch_shape_model
+run_name: d2_2000_epoch_shape_model_utransformer_
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20231126_031525_d2_energy_model
+energy_model: /remote/gpu05/palacios/calo_dreamer/results/20240114_171330_d2_energy_model_ARtransformer_
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
+xml_filename: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -17,7 +17,7 @@ shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+        ptype: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectiveUniformNoise: {
@@ -31,8 +31,8 @@ transforms: {
     },
     ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
     StandardizeFromFile: {
-        mean_path: /home/aore/calo_dreamer/dat/means_2_1.npy,
-        std_path: /home/aore/calo_dreamer/dat/stds_2_1.npy,
+        mean_path: /remote/gpu05/palacios/calo_dreamer/dat/means_2_1.npy,
+        std_path: /remote/gpu05/palacios/calo_dreamer/stds_2_1.npy,
         create: True
     },
     LogEnergy: {},
@@ -42,13 +42,13 @@ transforms: {
 }
 
 # Training
-lr: 1.e-3
-max_lr: 1.e-3
-batch_size: 2000
+lr: 5.e-3
+#max_lr: 1.e-3
+batch_size: 1024
 validate_every: 10
 use_scheduler: True
-lr_scheduler: one_cycle_lr
-weight_decay: 0.001
+lr_scheduler: CosineAnnealing
+#weight_decay: 0.001
 betas: [0.9, 0.999]
 n_epochs: 2000
 cycle_epochs: 2000
@@ -60,12 +60,17 @@ sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
 solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
+sample_us: True
 
+# Network
 # Network
 network: UNet
 condition_dim: 46
 level_channels: [32, 64, 128]
 encode_t: True
-encode_t_dim: 100
+encode_t_dim: 128
 encode_c: True
-encode_c_dim: 100
+encode_c_dim: 128
+cond_layers: 2
+add_noise: True
+
