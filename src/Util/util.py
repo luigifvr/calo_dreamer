@@ -82,7 +82,7 @@ def cosine_beta_schedule(timesteps, s = 0.008):
     return torch.clip(betas, 0, 0.999)
 
 
-def load_data(filename, particle_type,  xml_filename, threshold=1e-5, energy=None):
+def load_data(filename, particle_type,  xml_filename, threshold=1e-5, single_energy=None):
     """Loads the data for a dataset 1 from the calo challenge"""
     
     # Create a XML_handler to extract the layer boundaries. (Geometric setup is stored in the XML file)
@@ -97,16 +97,15 @@ def load_data(filename, particle_type,  xml_filename, threshold=1e-5, energy=Non
     # Load and store the data. Make sure to slice according to the layers.
     # Also normalize to 100 GeV (The scale of the original data is MeV)
     data_file = h5py.File(filename, 'r')
-    #data["energy"] = data_file["incident_energies"][:] / 1.e3
-    if energy is not None:
-        energy_mask = data_file["incident_energies"][:] == energy
-        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1) / 1.e3
-        for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()] / 1.e3
+    #data["energy"] = data_file["incident_energies"][:]
+    if single_energy is not None:
+        energy_mask = data_file["incident_energies"][:] == single_energy
     else:
-        data["energy"] = data_file["incident_energies"][:] / 1.e3
-        for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end] / 1.e3
+        energy_mask = np.full(len(data_file["incident_energies"]), True)
+
+    data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1)
+    for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
+        data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()]
     data_file.close()
     
     return data, layer_boundaries

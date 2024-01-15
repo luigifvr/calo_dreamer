@@ -13,15 +13,15 @@ def load_data_calo(filename, layer_boundaries, energy=None):
     data_file = h5py.File(filename, 'r')
     if energy is not None:
         energy_mask = data_file["incident_energies"][:] == energy
-        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1) / 1.e3
+        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1)
         print(energy_mask.shape)    
         for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()] / 1.e3
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()]
     else:
-        data["energy"] = data_file["incident_energies"][:] / 1.e3
-        #data["energy"] = data_file["incident_energies"][:] / 1.e3
+        data["energy"] = data_file["incident_energies"][:]
+        #data["energy"] = data_file["incident_energies"][:]
         for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end] / 1.e3
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end]
 
     data_file.close()
     
@@ -42,16 +42,16 @@ def load_data(filename, particle_type,  xml_filename, threshold=1e-5, energy=Non
     # Load and store the data. Make sure to slice according to the layers.
     # Also normalize to 100 GeV (The scale of the original data is MeV)
     data_file = h5py.File(filename, 'r')
-    #data["energy"] = data_file["incident_energies"][:] / 1.e3
+    #data["energy"] = data_file["incident_energies"][:]
     if energy is not None:
         energy_mask = data_file["incident_energies"][:] == energy
-        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1) / 1.e3
+        data["energy"] = data_file["incident_energies"][:][energy_mask].reshape(-1, 1)
         for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()] / 1.e3
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end][energy_mask.flatten()]
     else:
-        data["energy"] = data_file["incident_energies"][:] / 1.e3
+        data["energy"] = data_file["incident_energies"][:]
         for layer_index, (layer_start, layer_end) in enumerate(zip(layer_boundaries[:-1], layer_boundaries[1:])):
-            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end] / 1.e3
+            data[f"layer_{layer_index}"] = data_file["showers"][..., layer_start:layer_end]
     data_file.close()
     
     return data, layer_boundaries
@@ -430,15 +430,18 @@ def save_hlf(hlf, filename):
     print("Saving file with high-level features DONE.")
 
 def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
-                transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,):
+                transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,
+                single_energy=None):
 
     print("Dict of preprocessing is: ")
     print(transforms)
 
     train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
-                    val_frac=val_frac, transform=transforms, split='training', device=device)
+                    val_frac=val_frac, transform=transforms, split='training', device=device,
+                    single_energy=single_energy)
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
-                    val_frac=val_frac, transform=transforms, split='validation', device=device)
+                    val_frac=val_frac, transform=transforms, split='validation', device=device,
+                    single_energy=single_energy)
 
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)

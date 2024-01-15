@@ -12,6 +12,8 @@ import sys
 # Other functions of project
 from Util.util import *
 from data_util import get_loaders
+from datasets import CaloChallengeDataset
+from plotting_util import *
 from transforms import *
 from challenge_files import *
 from challenge_files import evaluate # avoid NameError: 'evaluate' is not defined
@@ -58,8 +60,9 @@ class GenerativeModel(nn.Module):
         self.doc = doc
         self.params = params
         self.device = device
-        self.dim = self.params["dim"]
+        self.shape = self.params['shape']#get(self.params,'shape')
         self.conditional = get(self.params,'conditional',False)
+        self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
 
         self.batch_size = self.params["batch_size"]
         self.batch_size_sample = get(self.params, "batch_size_sample", self.batch_size)
@@ -75,7 +78,6 @@ class GenerativeModel(nn.Module):
         self.validate_every = get(self.params, "validate_every", 50)
 
         #init preprocessing
-        # Ayo: TODO: Add dtype option to avoid placing `.float()` throughout model files.
         self.transforms = get_transformations(params.get('transforms', None))
         self.train_loader, self.val_loader, self.bounds = get_loaders(params.get('hdf5_file'),
                                                                     params.get('particle_type'),
@@ -86,7 +88,8 @@ class GenerativeModel(nn.Module):
                                                                     params.get('eps', 1.e-10),
                                                                     device=device,
                                                                     shuffle=True,
-                                                                    width_noise=params.get('width_noise', 1.e-6))
+                                                                    width_noise=params.get('width_noise', 1.e-6),
+                                                                    single_energy=params.get('single_energy', None))
 
     def build_net(self):
         pass
@@ -154,6 +157,7 @@ class GenerativeModel(nn.Module):
                 params.get("max_lr", params["lr"]*10),
                 epochs = params.get("cycle_epochs") or params["n_epochs"],
                 steps_per_epoch=steps_per_epoch,
+                pct_start=params.get("cycle_pct_start", 0.3)
                 )
         elif self.lr_sched_mode == "cycle_lr":
             self.scheduler = torch.optim.lr_scheduler.CyclicLR(
@@ -170,6 +174,14 @@ class GenerativeModel(nn.Module):
                     milestones=[2730, 8190, 13650, 27300],
                     gamma=0.5
                     )
+        elif self.lr_sched_mode == "CosineAnnealing":
+            n_epochs = params.get("cycle_epochs") or params["n_epochs"]
+            eta_min = params.get( "eta_min", 0)
+            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer=self.optimizer,
+                T_max=n_epochs * steps_per_epoch,
+                eta_min=eta_min
+            )
 
     def run_training(self):
 
@@ -203,7 +215,7 @@ class GenerativeModel(nn.Module):
                         bay_samples.append(sample)
 
                     samples = np.concatenate(bay_samples)
-                    self.plot_samples(samples=samples, conditions=c.reshape(-1, 1),name=self.epoch)
+                    self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.params['single_energy'])
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -234,7 +246,7 @@ class GenerativeModel(nn.Module):
             sampling_time = t_1 - t_0
             self.params["sampling_time"] = sampling_time
             print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
-            self.plot_samples(samples=samples, conditions=c.reshape(-1, 1))
+            self.plot_samples(samples=samples, conditions=c, energy=self.params['single_energy'])
 
     def train_one_epoch(self):
         # create list to save train_loss
@@ -252,14 +264,14 @@ class GenerativeModel(nn.Module):
                 loss.backward()
                 self.optimizer.step()
                 train_losses = np.append(train_losses, loss.item())
-                if self.log:
-                    self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+                # if self.log:
+                #     self.logger.add_scalar("train_losses", train_losses[-1], self.epoch*self.n_trainbatches + batch_id)
 
                 if self.use_scheduler:
                     self.scheduler.step()
-                    if self.log:
-                        self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
-                                               self.epoch * self.n_trainbatches + batch_id)
+                    # if self.log:
+                    #     self.logger.add_scalar("learning_rate", self.scheduler.get_last_lr()[0],
+                    #                            self.epoch * self.n_trainbatches + batch_id)
 
             else:
                 print(f"train_model: Unstable loss. Skipped backprop for epoch {self.epoch}, batch_id {batch_id}")
@@ -283,8 +295,8 @@ class GenerativeModel(nn.Module):
                 loss = self.batch_loss(x)
 
                 val_losses = np.append(val_losses, loss.item())
-                if self.log:
-                    self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
+                # if self.log:
+                #     self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
 
             self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
             self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
@@ -296,8 +308,8 @@ class GenerativeModel(nn.Module):
 
     def generate_Einc_ds1(self, energy=None, sample_multiplier=1000):
         """ generate the incident energy distribution of CaloChallenge ds1
-                        sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
-                        and 5, 3, 2, 1 times sample multiplier for the highest energies
+            sample_multiplier controls how many samples are generated: 10* sample_multiplier for low energies,
+            and 5, 3, 2, 1 times sample multiplier for the highest energies
 
         """
         ret = np.logspace(8, 18, 11, base=2)
@@ -311,41 +323,107 @@ class GenerativeModel(nn.Module):
         return ret
 
     def sample_n(self):
+        self.eval()
+
         if self.net.bayesian:
             self.net.map = get(self.params, "fix_mu", False)
             for bay_layer in self.net.bayesian_layers:
                 bay_layer.random = None
         sample = []
-        # Ayo: TODO: generalise condition generation for datasets 2 & 3
-        condition = torch.tensor(self.generate_Einc_ds1(), dtype=torch.get_default_dtype()).to(self.device)
+
+        Einc = torch.tensor(
+            # Ayo: TODO: Generalise number of samples to generate
+            # Ayo: TODO: Handle single energy option for datasets 2 & 3
+            10**np.random.uniform(3, 6, size=10**5) 
+            if self.params['eval_dataset'] in ['2', '3'] else
+            self.generate_Einc_ds1(energy=self.single_energy),
+            dtype=torch.get_default_dtype(),
+            device=self.device
+        ).unsqueeze(1)
         
-        # log-condition
-        condition = torch.log(condition/1e3)
+        # transform Einc to basis used in training
+        dummy = torch.empty(1, *self.params['shape'])
+        transformed_cond = torch.clone(Einc)
+        for fn in self.transforms:
+            if hasattr(fn, 'cond_transform'):
+                dummy, transformed_cond = fn(dummy, transformed_cond)
+
         batch_size_sample = get(self.params, "batch_size_sample", 10000)
-        condition_loader = DataLoader(dataset=condition, batch_size=batch_size_sample, shuffle=False)
+        transformed_cond_loader = DataLoader(
+            dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
+        )
+        
+        if self.params['model_type'] == 'shape': # sample u_i's if self is a shape model
+            # load energy model
+            energy_model = self.load_other(self.params['energy_model'])
+            energy_model.eval()
+            if self.params.get('sample_us', True):
+                # sample us
+                u_samples = torch.from_numpy(np.vstack([ # Ayo: TODO: avoid cast to numpy (it happens elsewhere too)
+                    energy_model.sample_batch(c) for c in transformed_cond_loader
+                ])).to(self.device)
+                transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
+            else:
+                transformed_cond = CaloChallengeDataset(
+                self.params.get('eval_hdf5_file'),
+                self.params.get('particle_type'),
+                self.params.get('xml_filename'),
+                transform=self.transforms, # TODO: Or, apply NormalizeEByLayer popped from model transforms
+                device=self.device,
+                single_energy=self.single_energy
+                ).energy
+            transformed_cond_loader = DataLoader(
+                dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
+            )
+                
+        sample = np.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
-        for _, batch in enumerate(condition_loader):
-            sample.append(self.sample_batch(batch))
-
-        sample = np.concatenate(sample)
-        condition = condition.detach().cpu()
-
-        # should condition be exponentiated?
-        return sample, condition
+        return sample, transformed_cond.detach().cpu()
 
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, conditions, name=""):
+    def plot_samples(self, samples, conditions, name="", energy=None):
         transforms = self.transforms
         samples = torch.from_numpy(samples) # since transforms expect torch.tensor
-        conditions = torch.exp(conditions)*1e3  # revert log-cond
-        for fn in transforms[::-1]:
-            samples, conditions = fn(samples, conditions, rev=True) # undo preprocessing
-        self.save_sample(samples, conditions, name=name)
-        evaluate.main(f"-i {self.doc.basedir}/samples{name}.hdf5 -r {self.params['hdf5_file']} -m all -d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/ --cut 0.0".split())
 
-    def save_sample(self, sample, energies,name=""):
+        if self.params['model_type'] == 'energy':
+            reference = CaloChallengeDataset(
+                self.params.get('eval_hdf5_file'),
+                self.params.get('particle_type'),
+                self.params.get('xml_filename'),
+                transform=transforms, # TODO: Or, apply NormalizeEByLayer popped from model transforms
+                device=self.device,
+                single_energy=self.single_energy
+            ).layers
+            
+            # postprocess
+            for fn in transforms[::-1]:
+                if fn.__class__.__name__ != 'NormalizeByElayer':
+                    samples, _ = fn(samples, conditions, rev=True)
+                    reference, _ = fn(reference, conditions, rev=True)
+            # clip u_i's (except u_0) to [0,1] 
+            samples[:,1:] = torch.clip(samples[:,1:], min=0., max=1.)
+            reference[:,1:] = torch.clip(reference[:,1:], min=0., max=1.)
+            
+            plot_ui_dists(
+                samples.detach().cpu().numpy(),
+                reference.detach().cpu().numpy(),
+                documenter=self.doc
+            )
+        else:
+            # postprocess
+            for fn in transforms[::-1]:
+                samples, conditions = fn(samples, conditions, rev=True)
+            self.save_sample(samples, conditions, name=name)
+            script_args = (
+                f"-i {self.doc.basedir}/samples{name}.hdf5 "
+                f"-r {self.params['eval_hdf5_file']} -m all --cut 15.15e-3 "
+                f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+            ) + (f" --energy {energy}" if energy is not None else '')
+            evaluate.main(script_args.split())
+
+    def save_sample(self, sample, energies, name=""):
         """Save sample in the correct format"""
     
         save_file = h5py.File(self.doc.get_file(f'samples{name}.hdf5'), 'w')
@@ -374,3 +452,15 @@ class GenerativeModel(nn.Module):
         #self.optim.load_state_dict(state_dicts["opt"])
         self.net.to(self.device)
 
+    def load_other(self, model_dir):
+        """ Load a different model (e.g. to sample u_i's)"""
+
+        with open(os.path.join(model_dir, 'params.yaml')) as f:
+            params = yaml.load(f, Loader=yaml.FullLoader)
+
+        other = self.__class__(params, self.device, None) # or maybe self.__class__.__init__?
+        # other.net = other.build_net()
+        state_dicts = torch.load(os.path.join(model_dir, 'model.pt'), map_location=self.device)
+        other.net.load_state_dict(state_dicts["net"])
+        
+        return other

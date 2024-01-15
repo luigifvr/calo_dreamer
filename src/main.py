@@ -7,6 +7,7 @@ import torch
 from documenter import Documenter
 from Models import *
 from Models.tbd import TBD
+import Models
 from challenge_files import evaluate
 
 def main():
@@ -15,7 +16,7 @@ def main():
     parser.add_argument('-c', '--use_cuda', action='store_true', default=False,)
     parser.add_argument('-p', '--plot', action='store_true', default=False,)
     parser.add_argument('-d', '--model_dir', default=None,)
-    parser.add_argument('-ep', '--epoch')
+    parser.add_argument('-ep', '--epoch', default='')
 
     args = parser.parse_args()
 
@@ -44,15 +45,18 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params, device, doc)
+    model = params.get("model", "TBD")
+    try:
+        model = getattr(Models, model)(params, device, doc)
+    except AttributeError:
+        raise NotImplementedError(f"build_model: Network class {network} not recognised")
+
     if not args.plot:
         model.run_training()
     else:
         model.load(args.epoch)
         x, c = model.sample_n()
         model.plot_samples(x, c, name=f"{args.epoch}")
-        #run plotting script
-        evaluate.main(f"-i {doc.basedir}/samples{args.epoch}.hdf5 -r {params['hdf5_file']} -m all -d {params['eval_dataset']} --output_dir {doc.basedir}/final/ --cut 0.0".split())
 
 if __name__=='__main__':
     main()

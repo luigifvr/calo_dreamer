@@ -161,7 +161,7 @@ def plot_E_layers(hlf_class, reference_class, arg):
         ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
         ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.0, 2.0)
+        ax[1].set_ylim(0.5, 1.5)
 
         ax[0].set_title("Energy deposited in layer {}".format(key))
         ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
@@ -317,7 +317,7 @@ def plot_ECWidthEtas(hlf_class, reference_class, arg):
         ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
         ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.0, 2.0)
+        ax[1].set_ylim(0.5, 1.5)
 
         ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
         ax[1].set_xlabel(r'[mm]')
@@ -368,7 +368,7 @@ def plot_ECWidthPhis(hlf_class, reference_class, arg):
         ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
         ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.0, 2.0)
+        ax[1].set_ylim(0.5, 1.5)
 
         ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
         ax[1].set_xlabel(r'[mm]')
@@ -466,7 +466,7 @@ def plot_cell_dist(shower_arr, ref_shower_arr, arg):
     ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=color, where='post')
     ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=color, alpha=0.2)
 
-    ax[1].set_ylim(0.0, 2.0)
+    ax[1].set_ylim(0.5, 1.5)
 
     ax[0].set_title(r"Voxel energy distribution")
     ax[1].set_xlabel(r'$E$ [MeV]')

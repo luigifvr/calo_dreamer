@@ -24,13 +24,16 @@ class TBD(GenerativeModel):
         except AttributeError:
             raise NotImplementedError(f"build_model: Trajectory type {trajectory} not implemented")
 
-
         self.C = get(self.params, "C", 1)
         if self.C != 1:
             print(f"C is {self.C}")
 
         self.bayesian = get(self.params, "bayesian", 0)
-        self.distribution = torch.distributions.uniform.Uniform(low=0, high=1)
+        self.t_min = get(self.params, "t_min", 0)
+        self.t_max = get(self.params, "t_max", 1)
+        self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
+        self.add_noise = get(self.params, "add_noise", False)
+        self.alpha = get(self.params, "alpha", 1.e-4)
 
 
     def build_net(self):
@@ -48,10 +51,11 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        x = input[0].clone()
+        # x = input[0].clone()
         condition = input[1]
         weights = None
-        return x, condition, weights
+        # return x, condition, weights
+        return input[0], condition, weights
 
     def batch_loss(self, x):
         """
@@ -59,14 +63,20 @@ class TBD(GenerativeModel):
         """
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
-        #x = x[:,:10]
-        t = self.distribution.sample((x.size(0),1)).to(x.device)
+        
+        # t = self.distribution.sample((x.size(0),1)).to(x.device)
+        t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
+        if self.add_noise:
+            x = x + self.alpha * torch.randn_like(x, device=x.device, dtype=x.dtype)
+            condition = condition + self.alpha * torch.randn_like(condition, device=condition.device, dtype=condition.dtype)
+
+
         x_t, x_t_dot = self.trajectory(x_0, x, t)
         self.net.kl = 0
-        drift = self.net(x_t, t, condition)
+        drift = self.net(x_t, t.view(-1, 1), condition)
 
-        loss = torch.mean((drift - x_t_dot) ** 2 )#* torch.exp(self.t_factor * t)) ?
+        loss = torch.mean((drift - x_t_dot) ** 2)#* torch.exp(self.t_factor * t)) ?
         # self.regular_loss.append(loss.detach().cpu().numpy())
         # if self.C != 0:
             # kl_loss = self.C*self.net.kl / self.n_traindata
@@ -80,14 +90,18 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        batch = batch[:, None]
+        # batch = batch[:, None] # moved to before sample_batch call
         dtype = batch.dtype
         device = batch.device
 
-        x_T = torch.randn((batch.shape[0], self.dim), dtype=dtype, device=device)
+        x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
+            # print(x_t.shape)
+            # print(t_torch.shape)
+            # print(batch.shape)
+            t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
             v = self.net(x_t, t_torch, batch)
 
             return v
@@ -100,11 +114,8 @@ class TBD(GenerativeModel):
 
             x_t = solver(function,
                          x_T,
-                         torch.tensor([0, 1], dtype=dtype, device=device),
-                         # atol = self.atol,
-                         # rtol = self.rtol,
-                         method='euler',
-                         options={"step_size": 0.01}
+                         torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                         **self.params.get("solver_kwargs", {})
                          ).detach().cpu().numpy()
 
             events.append(x_t[-1])
@@ -124,7 +135,7 @@ class TBD(GenerativeModel):
         n_samples = samples.shape[0]
 
         def f(t, x_t):
-            x_t_torch = torch.Tensor(x_t).reshape((-1, self.dim)).to(self.device)
+            x_t_torch = torch.Tensor(x_t).reshape((-1, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
             with torch.no_grad():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
@@ -134,10 +145,10 @@ class TBD(GenerativeModel):
         with torch.no_grad():
             for i in range(int(n_samples / batch_size)):
                 sol = solve_ivp(f, (1, 0), samples[batch_size * i: batch_size * (i + 1)].flatten())
-                s = sol.y[:, -1].reshape(batch_size, self.dim)
+                s = sol.y[:, -1].reshape(batch_size, *self.shape)
                 events.append(s)
             sol = solve_ivp(f, (1, 0), samples[batch_size * (i+1):].flatten())
-            s = sol.y[:, -1].reshape(-1, self.dim)
+            s = sol.y[:, -1].reshape(-1, *self.shape)
             events.append(s)
         return np.concatenate(events, axis=0)[:n_samples]
 
@@ -147,10 +158,10 @@ class TBD(GenerativeModel):
         t_frames = np.linspace(0, 1, n_frames)
 
         batch_size = get(self.params, "batch_size", 8192)
-        x_T = np.random.randn(n_samples + batch_size, self.dim)
+        x_T = np.random.randn(n_samples + batch_size, *self.shape)
 
         def f(t, x_t):
-            x_t_torch = torch.Tensor(x_t).reshape((batch_size, self.dim)).to(self.device)
+            x_t_torch = torch.Tensor(x_t).reshape((batch_size, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
             with torch.no_grad():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
@@ -160,7 +171,7 @@ class TBD(GenerativeModel):
         with torch.no_grad():
             for i in range(int(n_samples / batch_size) + 1):
                 sol = solve_ivp(f, (0, 1), x_T[batch_size * i: batch_size * (i + 1)].flatten(), t_eval=t_frames)
-                s = sol.y.reshape(batch_size, self.dim, -1)
+                s = sol.y.reshape(batch_size, *self.shape, -1)
                 events.append(s)
         return np.concatenate(events, axis=0)[:n_samples]
 
