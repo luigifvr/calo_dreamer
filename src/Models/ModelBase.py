@@ -17,6 +17,8 @@ from plotting_util import *
 from transforms import *
 from challenge_files import *
 from challenge_files import evaluate # avoid NameError: 'evaluate' is not defined
+import Models
+from Models import *
 
 class GenerativeModel(nn.Module):
     """
@@ -504,8 +506,13 @@ class GenerativeModel(nn.Module):
 
         with open(os.path.join(model_dir, 'params.yaml')) as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
-        doc = Documenter(None, existing_run=model_dir, read_only=True)
-        other = self.__class__(params, self.device, doc)
+
+        model = params.get("model", "TBD")
+        try:
+            other = getattr(Models, model)(params, self.device, None)
+        except AttributeError:
+            raise NotImplementedError(f"build_model: Model class {model} not recognised")
+
         state_dicts = torch.load(os.path.join(model_dir, 'model.pt'), map_location=self.device)
         other.net.load_state_dict(state_dicts["net"])
         
