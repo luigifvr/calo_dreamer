@@ -403,6 +403,10 @@ class GenerativeModel(nn.Module):
             reco, cond = self.sample_batch(x)
             recos.append(reco)
             energies.append(cond)
+        for n, x in enumerate(self.val_loader):
+            reco, cond = self.sample_batch(x)
+            recos.append(reco)
+            energies.append(cond)
 
         recos = torch.vstack(recos)
         energies = torch.vstack(energies)
