@@ -389,6 +389,24 @@ class GenerativeModel(nn.Module):
         sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
 
         return sample, transformed_cond.detach().cpu()
+    
+    def reconstruct_n(self,):
+        recos = []
+        energies = []
+
+        self.net.eval()
+        for n, x in enumerate(self.train_loader):
+            reco, cond = self.sample_batch(x)
+            recos.append(reco)
+            energies.append(cond)
+        for n, x in enumerate(self.val_loader):
+            reco, cond = self.sample_batch(x)
+            recos.append(reco)
+            energies.append(cond)
+
+        recos = torch.vstack(recos)
+        energies = torch.vstack(energies)
+        return recos, energies
 
     def sample_batch(self, batch):
         pass
