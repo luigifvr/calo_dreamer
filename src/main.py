@@ -45,7 +45,9 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params, device, doc)
+    Model = AE if params['network'] == 'AutoEncoder' else TBD
+    model = Model(params, device, doc) 
+    
     if not args.plot:
         model.run_training()
     else:

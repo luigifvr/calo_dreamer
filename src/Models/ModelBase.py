@@ -339,8 +339,7 @@ class GenerativeModel(nn.Module):
         sample = []
 
         Einc = torch.tensor(
-            # Ayo: TODO: Handle single energy option for datasets 2 & 3
-            10**np.random.uniform(3, 6, size=10**5) 
+            10**np.random.uniform(3, 6, size=get(self.params, "n_samples", 10**5)) 
             if self.params['eval_dataset'] in ['2', '3'] else
             self.generate_Einc_ds1(energy=self.single_energy),
             dtype=torch.get_default_dtype(),
