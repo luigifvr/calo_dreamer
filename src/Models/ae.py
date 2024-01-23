@@ -46,10 +46,13 @@ class AE(GenerativeModel):
         rec = self.net(x, condition)
         loss_fn = self.params.get('ae_loss', 'mse')
         if loss_fn == 'mse':
-            loss = torch.mean((x - rec) ** 2)
+            loss = torch.mean((x - rec) ** 2)          
         elif loss_fn == 'bce':
             loss_fn = torch.nn.BCELoss()
             loss = loss_fn(rec, x)
+        elif loss_fn == 'bce_sparsity':
+            loss_fn = torch.nn.BCELoss()
+            loss = loss_fn(rec, x) + 1e-5*torch.mean(rec.sum(dim=(1,2,3,4)))  
         elif loss_fn == 'mod-bce':
             loss_fn = torch.nn.CrossEntropyLoss()
             rec = rec.squeeze().reshape(-1, 16*9)

@@ -7,7 +7,7 @@ import numpy as np
 
 from documenter import Documenter
 from Models import *
-from Models.tbd import TBD
+# from Models.tbd import TBD
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')

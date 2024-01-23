@@ -608,8 +608,6 @@ class CylindricalUNet(nn.Module):
 
         return out
 
-<<<<<<< Updated upstream
-=======
 class AutoEncoder(nn.Module):
     """
     :param param: A dictionary containing the relevant network parameters:
@@ -674,7 +672,8 @@ class AutoEncoder(nn.Module):
         self.output_layer = nn.Conv3d(
             in_channels=level_channels[0], out_channels=1, kernel_size=(1, 1, 1)
         )
-        self.out_act = torch.nn.Softmax(-1)
+        # self.out_act = torch.nn.Softmax(-1)
+        self.out_act = torch.nn.Sigmoid()
 
     def forward(self, x, c=None):
 
@@ -793,7 +792,6 @@ class CylindricalAutoEncoder(nn.Module):
 
         return out
 
->>>>>>> Stashed changes
 def add_coord_channels(x, break_dims=None):
     ndim = len(x.shape)  # TODO: move to init? and other optimisations
     channels = [x]
