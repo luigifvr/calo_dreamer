@@ -373,7 +373,22 @@ class Reshape(object):
         else:
             shower = shower.reshape(-1, *self.shape)
         return shower, energy
-    
+ 
+class Reweight(object):
+    """
+    Reweight voxels
+    """
+
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            shower = shower**(1/self.factor)
+        else:
+            shower = shower**(self.factor)
+        return shower, energy
+
 class NormalizeByElayer(object):
     """
     Normalize each shower by the layer energy

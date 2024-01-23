@@ -5,6 +5,7 @@ import Networks
 import Models
 from Models.ModelBase import GenerativeModel
 from Util.util import get
+from Util.util import loss_cbvae
 
 from challenge_files import *
 from challenge_files import evaluate
@@ -59,7 +60,9 @@ class AE(GenerativeModel):
             loss_fn = torch.nn.BCELoss()
             loss_bce = loss_fn(rec, x)
             loss_mse = torch.mean((torch.special.logit(x, eps=1.e-6) - torch.special.logit(rec, eps=1.e-6))**2)
-            loss = loss_bce+ 0.001*loss_mse
+            loss = loss_bce+ 0.0001*loss_mse
+        elif loss_fn == 'cbce':
+            loss = loss_cbvae(rec, x)
         else:
             raise Exception("Unknown loss function")
 
@@ -71,7 +74,7 @@ class AE(GenerativeModel):
             rec = self.net(x, condition)
         return rec.detach().cpu(), condition.detach().cpu()
  
-    def plot_samples(self, samples, conditions, name="", energy=None):
+    def plot_samples(self, samples, conditions, name="", energy=None, mode='all'): #TODO
         transforms = self.transforms
         print("Plotting reconstructions of input showers")
 
@@ -83,3 +86,9 @@ class AE(GenerativeModel):
 
         self.save_sample(samples, conditions, name="_ae_reco")
         evaluate.run_from_py(samples, conditions, self.doc, self.params)
+
+    def get_latent(self, x):
+        with torch.no_grad():
+            x, condition, weights = self.get_conditions_and_input(x)
+            z = self.net.encode(x, condition)
+        return z.detach().cpu(), condition.detach().cpu()
