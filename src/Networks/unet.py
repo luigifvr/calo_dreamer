@@ -638,7 +638,7 @@ class AutoEncoder(nn.Module):
 
         # Bottleneck block
         self.bottleneck = nn.Conv3d(
-                in_channels=level_channels[-1], out_channels=1, kernel_size=(1,1,1)
+                in_channels=level_channels[-1], out_channels=bottle_channel, kernel_size=(1,1,1)
         )
 
         # Upsampling blocks
