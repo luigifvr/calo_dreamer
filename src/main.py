@@ -7,7 +7,6 @@ import numpy as np
 
 from documenter import Documenter
 from Models import *
-from Models.tbd import TBD
 import Models
 from challenge_files import evaluate
 

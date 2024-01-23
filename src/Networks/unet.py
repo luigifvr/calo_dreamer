@@ -653,6 +653,8 @@ class AutoEncoder(nn.Module):
         self.output_layer = nn.Conv3d(
             in_channels=level_channels[0], out_channels=1, kernel_size=(1, 1, 1)
         )
+        # self.out_act = torch.nn.Softmax(-1)
+        self.out_act = torch.nn.Sigmoid()
 
     def forward(self, x, c=None):
 
@@ -676,7 +678,6 @@ class AutoEncoder(nn.Module):
         out = self.output_layer(out)
 
         return out
-
 
 def add_coord_channels(x, break_dims=None):
     ndim = len(x.shape)  # TODO: move to init? and other optimisations

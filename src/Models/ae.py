@@ -44,7 +44,27 @@ class AE(GenerativeModel):
         x, condition, weights = self.get_conditions_and_input(x)
 
         rec = self.net(x, condition)
-        loss = torch.mean((x - rec) ** 2)
+        loss_fn = self.params.get('ae_loss', 'mse')
+        if loss_fn == 'mse':
+            loss = torch.mean((x - rec) ** 2)          
+        elif loss_fn == 'bce':
+            loss_fn = torch.nn.BCELoss()
+            loss = loss_fn(rec, x)
+        elif loss_fn == 'bce_sparsity':
+            loss_fn = torch.nn.BCELoss()
+            loss = loss_fn(rec, x) + 1e-5*torch.mean(rec.sum(dim=(1,2,3,4)))  
+        elif loss_fn == 'mod-bce':
+            loss_fn = torch.nn.CrossEntropyLoss()
+            rec = rec.squeeze().reshape(-1, 16*9)
+            x = x.squeeze().reshape(-1, 16*9)
+            loss = loss_fn(rec, x)
+        elif loss_fn == 'bce_mse':
+            loss_fn = torch.nn.BCELoss()
+            loss_bce = loss_fn(rec, x)
+            loss_mse = torch.mean((torch.special.logit(x, eps=1.e-6) - torch.special.logit(rec, eps=1.e-6))**2)
+            loss = loss_bce+ 0.001*loss_mse
+        else:
+            raise Exception("Unknown loss function")
 
         return loss
     
