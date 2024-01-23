@@ -8,6 +8,9 @@ import numpy as np
 from documenter import Documenter
 from Models import *
 # from Models.tbd import TBD
+from Models.tbd import TBD
+import Models
+from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -45,19 +48,18 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    Model = AE if params['network'] == 'AutoEncoder' else TBD
-    model = Model(params, device, doc) 
-    
+    model = params.get("model", "TBD")
+    try:
+        model = getattr(Models, model)(params, device, doc)
+    except AttributeError:
+        raise NotImplementedError(f"build_model: Model class {model} not recognised")
+
     if not args.plot:
         model.run_training()
     else:
-        if args.generate:
-            model.load(args.epoch)
-            x, c = model.sample_n()
-            model.plot_samples(x, c, name=f"{args.epoch}")
-            #model.eval_samples(x, c, name=f"{args.epoch}")
-        else:
-            model.plot_saved_samples(name=f"{args.epoch}")
+        model.load(args.epoch)
+        x, c = model.sample_n()
+        model.plot_samples(x, c, name=f"{args.epoch}")
 
 if __name__=='__main__':
     main()

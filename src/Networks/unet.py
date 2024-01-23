@@ -1,4 +1,4 @@
-from itertools import pairwise
+from more_itertools import pairwise
 import numpy as np
 import torch
 import torch.nn as nn
