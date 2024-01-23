@@ -63,6 +63,7 @@ class GenerativeModel(nn.Module):
         self.shape = self.params['shape']#get(self.params,'shape')
         self.conditional = get(self.params,'conditional',False)
         self.single_energy = get(self.params, 'single_energy', None) # Train on a single energy
+        self.eval_mode = get(self.params, 'eval_mode', 'all')
 
         self.batch_size = self.params["batch_size"]
         self.batch_size_sample = get(self.params, "batch_size_sample", self.batch_size)
@@ -219,9 +220,11 @@ class GenerativeModel(nn.Module):
                     #     sample, c = self.sample_n()
                     #     bay_samples.append(sample)
                     # samples = np.concatenate(bay_samples)
-
-                    samples, c = self.sample_n()
-                    self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy)
+                    if get(self.params, "reconstruct", False):
+                        samples, c = self.reconstruct_n()
+                    else:
+                        samples, c = self.sample_n()
+                    self.plot_samples(samples=samples, conditions=c, name=self.epoch, energy=self.single_energy, mode=self.eval_mode)
 
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
@@ -395,6 +398,22 @@ class GenerativeModel(nn.Module):
         return sample, transformed_cond.detach().cpu()
     
     def reconstruct_n(self,):
+        if ~hasattr(self, 'train_loader'):
+            self.train_loader, self.val_loader, self.bounds = get_loaders(
+                self.params.get('hdf5_file'),
+                self.params.get('particle_type'),
+                self.params.get('xml_filename'),
+                self.params.get('val_frac'),
+                self.params.get('batch_size'),
+                self.transforms,
+                self.params.get('eps', 1.e-10),
+                device=self.device,
+                shuffle=False,
+                width_noise=self.params.get('width_noise', 1.e-6),
+                single_energy=self.params.get('single_energy', None)
+            )
+
+
         recos = []
         energies = []
 
@@ -415,7 +434,7 @@ class GenerativeModel(nn.Module):
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, conditions, name="", energy=None):
+    def plot_samples(self, samples, conditions, name="", energy=None, mode='all'):  #TODO: implement mode sel.
         
         transforms = self.transforms
 
