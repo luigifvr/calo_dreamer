@@ -306,6 +306,48 @@ class SelectiveUniformNoise(object):
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy        
 
+class SetToVal(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, val=0.):
+        self.val = val
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        else:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        return transformed, energy        
+
+class ZeroMask2(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, cut=0.):
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        return transformed, energy        
+
 class ZeroMask(object):
     """
     Masks voxels to zero in the reverse transformation

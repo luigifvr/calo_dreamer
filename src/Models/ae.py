@@ -52,10 +52,7 @@ class AE(GenerativeModel):
             loss_fn = torch.nn.BCELoss()
             loss = loss_fn(rec, x)
         elif loss_fn == 'mod-bce':
-            loss_fn = torch.nn.CrossEntropyLoss()
-            rec = rec.squeeze().reshape(-1, 16*9)
-            x = x.squeeze().reshape(-1, 16*9)
-            loss = loss_fn(rec, x)
+            loss = -torch.mean(x*rec)
         elif loss_fn == 'bce_mse':
             loss_fn = torch.nn.BCELoss()
             loss_bce = loss_fn(rec, x)
