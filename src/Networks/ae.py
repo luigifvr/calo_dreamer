@@ -45,14 +45,14 @@ class Conv3DBlock(nn.Module):
         #        in_channels=in_channels, out_channels=in_channels, 
         #        kernel_size=7, padding=3
         #        )
-
+        self.break_dims = break_dims or []
         self.conv1 = nn.Conv3d(
-            in_channels=in_channels, out_channels=out_channels,
+            in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
@@ -62,11 +62,9 @@ class Conv3DBlock(nn.Module):
         self.bottleneck = bottleneck
         if not bottleneck:
             self.pooling = nn.Conv3d(
-                in_channels=out_channels, out_channels=out_channels,
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
-
-        self.break_dims = break_dims or []
 
     def forward(self, input, condition=None):
 
@@ -122,13 +120,14 @@ class UpConv3DBlock(nn.Module):
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.l_conv = nn.ConvTranspose3d(
-            in_channels=in_channels, out_channels=in_channels,
-            kernel_size=7, padding=3,
-        )
+        # self.l_conv = nn.ConvTranspose3d(
+        #     in_channels=in_channels, out_channels=in_channels,
+        #     kernel_size=7, padding=3,
+        # )
  
+        self.break_dims = break_dims or []
         self.upconv1 = nn.ConvTranspose3d(
-            in_channels=in_channels, out_channels=out_channels,
+            in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=up_kernel, stride=up_stride, padding=up_crop,
             output_padding=output_padding
         )
@@ -137,15 +136,13 @@ class UpConv3DBlock(nn.Module):
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
-
-        self.break_dims = break_dims or []
 
     def forward(self, input, residual=None, condition=None):
 
@@ -229,7 +226,8 @@ class AutoEncoder(nn.Module):
 
         # Bottleneck block
         self.bottleneck = nn.Conv3d(
-                in_channels=level_channels[-1], out_channels=bottle_channel, kernel_size=(1,1,1)
+                in_channels=level_channels[-1]+len(self.ae_break_dims),
+                out_channels=bottle_channel, kernel_size=(1,1,1)
         )
 
         # Upsampling blocks
@@ -243,7 +241,8 @@ class AutoEncoder(nn.Module):
 
         # Output layer
         self.output_layer = nn.Conv3d(
-            in_channels=level_channels[0], out_channels=1, kernel_size=(1, 1, 1)
+            in_channels=level_channels[0]+len(self.ae_break_dims),
+            out_channels=1, kernel_size=(1, 1, 1)
         )
         self.out_act = torch.nn.Softmax(-1)
 
