@@ -44,12 +44,12 @@ class Conv3DBlock(nn.Module):
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         self.conv1 = nn.Conv3d(
             in_channels=in_channels, out_channels=out_channels,
-            kernel_size=3, padding=1
+            kernel_size=3, padding=1, bias=False
         )
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(
             in_channels=out_channels, out_channels=out_channels,
-            kernel_size=3, padding=1
+            kernel_size=3, padding=1, bias=False
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.act = nn.SiLU()
@@ -118,11 +118,11 @@ class UpConv3DBlock(nn.Module):
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
             in_channels=out_channels, out_channels=out_channels,
-            kernel_size=3, padding=1
+            kernel_size=3, padding=1, bias=False
         )
         self.conv2 = nn.Conv3d(
             in_channels=out_channels, out_channels=out_channels,
-            kernel_size=3, padding=1
+            kernel_size=3, padding=1, bias=False
         )
 
     def forward(self, input, residual=None, condition=None):
@@ -304,12 +304,12 @@ class CylindricalConv3DBlock(nn.Module):
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         self.break_dims = break_dims or []
         self.conv1 = nn.Conv3d(
-            in_channels=in_channels+len(self.break_dims),
+            in_channels=in_channels+len(self.break_dims), bias=False,
             out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels+len(self.break_dims),
+            in_channels=out_channels+len(self.break_dims), bias=False,
             out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
@@ -391,11 +391,11 @@ class CylindricalUpConv3DBlock(nn.Module):
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
-            in_channels=out_channels+len(self.break_dims),
+            in_channels=out_channels+len(self.break_dims), bias=False,
             out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels+len(self.break_dims),
+            in_channels=out_channels+len(self.break_dims), bias=False,
             out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
         self.circ_pad = lambda x, p: F.pad(
