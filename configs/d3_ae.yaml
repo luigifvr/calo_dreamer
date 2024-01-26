@@ -1,30 +1,30 @@
-run_name: d2_ae
+run_name: d3_ae
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
+energy_model: /home/aore/calo_dreamer/results/20240105_025022_d3_energy_model
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5 # for the ae this is the training file
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_1.hdf5
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_3.xml
 val_frac: 0.05
 eps: 1.0e-10
 particle_type: electron
-eval_dataset: "2"
+eval_dataset: "3"
 eval_cut: 15.15e-3
-shape: [1, 45, 16, 9]
+shape: [1, 45, 50, 18]
 
 transforms: {
     NormalizeByElayer: {
-      ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+      ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_3.xml,
       xml_file: electron
     },
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
-    AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
+    AddFeaturesToCond: {split_index: 40500},
+    Reshape: {shape: [1, 45, 50, 18]}
 }
 
 # Training
@@ -36,26 +36,27 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 100
-cycle_epochs: 100
+n_epochs: 200
+cycle_epochs: 200
 cycle_pct_start: 0.2
 save_interval: 100_001
 
 # Sampling
 reconstruct: True
 sample_periodically: False
-batch_size_sample: 256
 
 # Network
+model: AE
 network: AutoEncoder
 condition_dim: 46
 
 # AutoEncoder
 ae_loss: 'bce'
-ae_level_channels: [64, 4]
+ae_level_channels: [128, 4]
 ae_level_kernels: [[3,4,3]]
 ae_level_strides: [[3,2,1]]
 ae_level_pads: [[0,0,0]]
 ae_break_dims: [2,4]
 ae_encode_c: True
 ae_encode_c_dim: 100
+# ae_softmax_temp: 0.75

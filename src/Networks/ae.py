@@ -4,6 +4,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def add_coord_channels(x, break_dims=None):
+    ndim = len(x.shape)
+    channels = [x]
+    for d in break_dims:
+        coord = torch.linspace(0, 1, x.shape[d], device=x.device)
+        cast_shape = np.where(np.arange(ndim) == d, -1, 1)
+        expand_shape = np.where(np.arange(ndim) == 1, 1, x.shape)
+        channels.append(coord.view(*cast_shape).expand(*expand_shape))
+    return torch.cat(channels, dim=1)
+
 # modified from https://github.com/AghdamAmir/3D-UNet/blob/main/unet3d.py
 # allows for different implementation compared to unet
 class Conv3DBlock(nn.Module):
@@ -18,10 +28,12 @@ class Conv3DBlock(nn.Module):
         down_pad     -- size of the circular padding
         cond_dim     -- dimension of conditional input
         bottleneck   -- whether this is the bottlneck block
+        break_dims   -- the index of dimensions at which translation symmetry
+                        should be broken
     """
 
     def __init__(self, in_channels, out_channels, down_kernel=None, down_stride=None,
-                 down_pad=None, cond_dim=None, bottleneck=False):
+                 down_pad=None, cond_dim=None, bottleneck=False, break_dims=None):
 
         super(Conv3DBlock, self).__init__()
 
@@ -54,11 +66,14 @@ class Conv3DBlock(nn.Module):
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
 
+        self.break_dims = break_dims or []
+
     def forward(self, input, condition=None):
 
         #res = self.l_conv(input)
         # conv1
-        res = self.conv1(input)
+        res = add_coord_channels(input, self.break_dims)
+        res = self.conv1(res)
 
         # conditioning
         if condition is not None:
@@ -69,6 +84,7 @@ class Conv3DBlock(nn.Module):
         #res = self.bn1(self.act(res))
 
         # conv2
+        res = add_coord_channels(res, self.break_dims)
         res = self.conv2(res)
         res = self.act(self.bn2(res))
         #res = self.bn2(self.act(res))
@@ -76,7 +92,8 @@ class Conv3DBlock(nn.Module):
         # pooling
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = add_coord_channels(res, self.break_dims)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
@@ -94,11 +111,12 @@ class UpConv3DBlock(nn.Module):
         up_crop        -- size of cropping in the circular dimension
         cond_dim       -- dimension of conditional input
         output_padding -- argument forwarded to ConvTranspose
-        
+        break_dims   -- the index of dimensions at which translation symmetry
+                should be broken
     """
 
     def __init__(self, in_channels, out_channels, up_kernel=None, up_stride=None,
-                 up_crop=0, cond_dim=None, output_padding=0):
+                 up_crop=0, cond_dim=None, output_padding=0, break_dims=None):
 
         super(UpConv3DBlock, self).__init__()
 
@@ -127,17 +145,21 @@ class UpConv3DBlock(nn.Module):
             kernel_size=3, padding=1
         )
 
+        self.break_dims = break_dims or []
+
     def forward(self, input, residual=None, condition=None):
 
         #out = self.l_conv(input)
         # upsample
-        out = self.upconv1(input)
+        out = add_coord_channels(input, self.break_dims)
+        out = self.upconv1(out)
 
         # residual connection
         if residual != None:
             out = out + residual
 
         # conv1
+        out = add_coord_channels(out, self.break_dims)
         out = self.conv1(out)
 
         # conditioning
@@ -149,6 +171,7 @@ class UpConv3DBlock(nn.Module):
         out = self.act(self.bn1(out))
 
         # conv2
+        out = add_coord_channels(out, self.break_dims)
         out = self.conv2(out)
         #out = self.bn2(self.act(out))
         out = self.act(self.bn2(out))
@@ -174,17 +197,19 @@ class AutoEncoder(nn.Module):
             'ae_level_pads': [0],
             'ae_encode_c': False,
             'ae_encode_c_dim': 32,
+            'ae_break_dims': None,
             'activation': nn.SiLU(),
         }
 
         for k, p in defaults.items():
             setattr(self, k, param[k] if k in param else p)
+        
+        self.ae_break_dims = self.ae_break_dims or None
 
         # Conditioning
         self.total_condition_dim = self.ae_encode_c_dim if self.ae_encode_c else self.condition_dim
 
         if self.ae_encode_c_dim:
-            # self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
             self.c_encoding = nn.Sequential(
                 nn.Linear(self.condition_dim, self.ae_encode_c_dim),
                 nn.ReLU(),
@@ -197,7 +222,8 @@ class AutoEncoder(nn.Module):
         self.down_blocks = nn.ModuleList([
             Conv3DBlock(
                 n, m, self.ae_level_kernels[i], self.ae_level_strides[i],
-                self.ae_level_pads[i], cond_dim=self.total_condition_dim
+                self.ae_level_pads[i], cond_dim=self.total_condition_dim,
+                break_dims=self.ae_break_dims
             ) for i, (n, m) in enumerate(pairwise([self.in_channels] + level_channels))
         ])
 
@@ -210,7 +236,8 @@ class AutoEncoder(nn.Module):
         self.up_blocks = nn.ModuleList([
             UpConv3DBlock(
                 n, m, self.ae_level_kernels[-1 -i], self.ae_level_strides[-1-i],
-                self.ae_level_pads[-1-i], cond_dim=self.total_condition_dim
+                self.ae_level_pads[-1-i], cond_dim=self.total_condition_dim,
+                break_dims=self.ae_break_dims
             ) for i, (n, m) in enumerate(pairwise([bottle_channel] + level_channels[::-1]))
         ])
 
@@ -232,6 +259,7 @@ class AutoEncoder(nn.Module):
             out, _ = down(out, c)
         
         # bottleneck
+        out = add_coord_channels(out, self.ae_break_dims)
         out = self.bottleneck(out)
         
         # up path
@@ -239,6 +267,7 @@ class AutoEncoder(nn.Module):
             out = up(out, residual=None, condition=c)
 
         # output
+        out = add_coord_channels(out, self.ae_break_dims)
         out = self.output_layer(out)
         #out[out<-11.5] = torch.tensor(-np.inf)
         #out = self.out_act(out.reshape(-1, 1, 45, 16*9)).reshape(-1, 1, 45, 16, 9)
@@ -253,8 +282,11 @@ class AutoEncoder(nn.Module):
         out = x
         for down in self.down_blocks:
             out, _ = down(out, c)
+        out = add_coord_channels(out, self.ae_break_dims)
         out = self.bottleneck(out)
         return out
+
+    # TODO: write decode func
 
 class CylindricalAutoEncoder(nn.Module):
     """
@@ -299,7 +331,7 @@ class CylindricalAutoEncoder(nn.Module):
         self.down_blocks = nn.ModuleList([
             CylindricalConv3DBlock(
                 n, m, self.ae_level_kernels[i], self.ae_level_strides[i],
-                self.ae_level_pads[i], cond_dim=self.total_condition_dim, break_dims=self.break_dims
+                self.ae_level_pads[i], cond_dim=self.total_condition_dim, break_dims=self.break_dims,
             ) for i, (n, m) in enumerate(pairwise([self.in_channels] + level_channels))
         ])
 
