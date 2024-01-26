@@ -402,12 +402,12 @@ class GenerativeModel(nn.Module):
         self.net.eval()
         for n, x in enumerate(self.train_loader):
             reco, cond = self.sample_batch(x)
-            recos.append(reco)
-            energies.append(cond)
+            recos.append(reco.detach().cpu())
+            energies.append(cond.detach().cpu())
         for n, x in enumerate(self.val_loader):
             reco, cond = self.sample_batch(x)
-            recos.append(reco)
-            energies.append(cond)
+            recos.append(reco.detach().cpu())
+            energies.append(cond.detach().cpu())
 
         recos = torch.vstack(recos)
         energies = torch.vstack(energies)

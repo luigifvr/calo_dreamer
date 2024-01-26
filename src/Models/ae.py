@@ -87,10 +87,10 @@ class AE(GenerativeModel):
         self.save_sample(samples, conditions, name="_ae_reco")
         evaluate.run_from_py(samples, conditions, self.doc, self.params)
 
-    def plot_saved_samples(self, name="", energy=None):
+    def plot_saved_samples(self, name="", energy=None, mode='all'):
         script_args = (
             f"-i {self.doc.basedir}/samples_ae_reco{name}.hdf5 "
-            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
             f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())

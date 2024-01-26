@@ -3,13 +3,10 @@ import os
 import shutil
 import yaml
 import torch
+import Models
 import numpy as np
 
 from documenter import Documenter
-from Models import *
-# from Models.tbd import TBD
-from Models.tbd import TBD
-import Models
 from challenge_files import evaluate
 
 def main():
