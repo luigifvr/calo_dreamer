@@ -21,6 +21,7 @@ class GaussianFourierProjection(nn.Module): # TODO: Move this (and defn in resne
 
 
 # modified from https://github.com/AghdamAmir/3D-UNet/blob/main/unet3d.py
+# allows for different implementation compared to unet
 class Conv3DBlock(nn.Module):
     """
     Downsampling block for U-Net.
@@ -33,23 +34,26 @@ class Conv3DBlock(nn.Module):
         down_pad     -- size of the circular padding
         cond_dim     -- dimension of conditional input
         bottleneck   -- whether this is the bottlneck block
+        break_dims   -- the indices of dimensions at which translation symmetry
+                        should be broken
     """
 
     def __init__(self, in_channels, out_channels, down_kernel=None, down_stride=None,
-                 down_pad=None, cond_dim=None, bottleneck=False):
+                 down_pad=None, cond_dim=None, bottleneck=False, break_dims=None):
 
         super(Conv3DBlock, self).__init__()
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         
+        self.break_dims = break_dims or []
         self.conv1 = nn.Conv3d(
-            in_channels=in_channels, out_channels=out_channels,
+            in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
@@ -58,14 +62,15 @@ class Conv3DBlock(nn.Module):
         self.bottleneck = bottleneck
         if not bottleneck:
             self.pooling = nn.Conv3d(
-                in_channels=out_channels, out_channels=out_channels,
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
 
     def forward(self, input, condition=None):
 
         # conv1
-        res = self.conv1(input)
+        res = add_coord_channels(input, self.break_dims)
+        res = self.conv1(res)
 
         # conditioning
         if condition is not None:
@@ -75,17 +80,18 @@ class Conv3DBlock(nn.Module):
         res = self.act(self.bn1(res))
 
         # conv2
+        res = add_coord_channels(res, self.break_dims)
         res = self.conv2(res)
         res = self.act(self.bn2(res))
 
         # pooling
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = add_coord_channels(res, self.break_dims)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
-
 
 class UpConv3DBlock(nn.Module):
 
@@ -100,23 +106,21 @@ class UpConv3DBlock(nn.Module):
         up_crop        -- size of cropping in the circular dimension
         cond_dim       -- dimension of conditional input
         output_padding -- argument forwarded to ConvTranspose
-        
+        break_dims   -- the indices of dimensions at which translation symmetry
+                should be broken
     """
 
     def __init__(self, in_channels, out_channels, up_kernel=None, up_stride=None,
-                 up_crop=0, cond_dim=None, output_padding=0):
+                 up_crop=0, cond_dim=None, output_padding=0, break_dims=None):
 
         super(UpConv3DBlock, self).__init__()
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.l_conv = nn.ConvTranspose3d(
-            in_channels=in_channels, out_channels=in_channels,
-            kernel_size=7, padding=3,
-        )
  
+        self.break_dims = break_dims or []
         self.upconv1 = nn.ConvTranspose3d(
-            in_channels=in_channels, out_channels=out_channels,
+            in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=up_kernel, stride=up_stride, padding=up_crop,
             output_padding=output_padding
         )
@@ -124,24 +128,26 @@ class UpConv3DBlock(nn.Module):
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels,
+            in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
             kernel_size=3, padding=1
         )
 
     def forward(self, input, residual=None, condition=None):
 
         # upsample
-        out = self.upconv1(input)
+        out = add_coord_channels(input, self.break_dims)
+        out = self.upconv1(out)
 
         # residual connection
         if residual != None:
             out = out + residual
 
         # conv1
+        out = add_coord_channels(out, self.break_dims)
         out = self.conv1(out)
 
         # conditioning
@@ -152,6 +158,7 @@ class UpConv3DBlock(nn.Module):
         out = self.act(self.bn1(out))
 
         # conv2
+        out = add_coord_channels(out, self.break_dims)
         out = self.conv2(out)
         out = self.act(self.bn2(out))
 
@@ -170,6 +177,8 @@ class UNet(nn.Module):
                   level_kernels  -- Kernel shape for the up/down sampling operations
                   level_strides  -- Stride shape for the up/down sampling operations
                   level_pads     -- Padding for the up/down sampling operations
+                  break_dims     -- the indices of dimensions at which translation
+                                    symmetry should be broken
                   encode_t       -- Whether or not to embed the time input
                   encode_t_dim   -- Dimension of the time embedding
                   encode_t_scale -- Scale for the Gaussian Fourier projection
@@ -191,6 +200,7 @@ class UNet(nn.Module):
             'level_kernels': [[3, 2, 3], [3, 2, 3]],
             'level_strides': [[3, 2, 3], [3, 2, 3]],
             'level_pads': [0, 0],
+            'break_dims': None,
             'encode_t': False,
             'encode_t_dim': 32,
             'encode_t_scale': 30,
@@ -202,6 +212,8 @@ class UNet(nn.Module):
 
         for k, p in defaults.items():
             setattr(self, k, param[k] if k in param else p)
+
+        self.break_dims = self.break_dims or []
 
         # Conditioning
         self.total_condition_dim = (self.encode_t_dim if self.encode_t else 1) \
@@ -228,27 +240,30 @@ class UNet(nn.Module):
         self.down_blocks = nn.ModuleList([
             Conv3DBlock(
                 n, m, self.level_kernels[i], self.level_strides[i],
-                self.level_pads[i], cond_dim=self.total_condition_dim
+                self.level_pads[i], cond_dim=self.total_condition_dim,
+                break_dims=self.break_dims
             ) for i, (n, m) in enumerate(pairwise([self.in_channels] + level_channels))
         ])
 
         # Bottleneck block
         self.bottleneck_block = Conv3DBlock(
             level_channels[-1], bottle_channel, bottleneck=True,
-            cond_dim=self.total_condition_dim,
+            cond_dim=self.total_condition_dim, break_dims=self.break_dims
         )
 
         # Upsampling blocks
         self.up_blocks = nn.ModuleList([
             UpConv3DBlock(
                 n, m, self.level_kernels[-1 -i], self.level_strides[-1-i],
-                self.level_pads[-1-i], cond_dim=self.total_condition_dim
+                self.level_pads[-1-i], cond_dim=self.total_condition_dim,
+                break_dims=self.break_dims
             ) for i, (n, m) in enumerate(pairwise([bottle_channel] + level_channels[::-1]))
         ])
 
         # Output layer
         self.output_layer = nn.Conv3d(
-            in_channels=level_channels[0], out_channels=1, kernel_size=(1, 1, 1)
+            in_channels=level_channels[0]+len(self.break_dims), out_channels=1,
+            kernel_size=(1, 1, 1)
         )
 
         self.kl = torch.zeros(())
@@ -280,6 +295,7 @@ class UNet(nn.Module):
             out = up(out, residuals.pop(), condition)
 
         # output
+        out = add_coord_channels(out, self.break_dims)
         out = self.output_layer(out)
 
         return out
