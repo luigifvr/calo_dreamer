@@ -251,41 +251,32 @@ class AutoEncoder(nn.Module):
         if self.ae_encode_c:
             c = self.c_encoding(c)
 
-        out = x
+        z = self.encode(x, c=c)
+        x = self.decode(z, c=c)
 
-        # down path
+        return x
+
+
+    def encode(self, x, c=None):
+
+        out = x
         for down in self.down_blocks:
             out, _ = down(out, c)
-        
-        # bottleneck
         out = add_coord_channels(out, self.ae_break_dims)
         out = self.bottleneck(out)
-        
-        # up path
+        return out
+
+    def decode(self, z, c=None):
+
+        out = z
         for up in self.up_blocks:
             out = up(out, residual=None, condition=c)
 
-        # output
         out = add_coord_channels(out, self.ae_break_dims)
         out = self.output_layer(out)
-        #out[out<-11.5] = torch.tensor(-np.inf)
-        #out = self.out_act(out.reshape(-1, 1, 45, 16*9)).reshape(-1, 1, 45, 16, 9)
-        #out = F.softmax(out, -3, _stack)
-        out = F.sigmoid(out) 
-        return out
+        
+        return torch.sigmoid(out)
 
-    def encode(self, x, c):
-
-        if self.ae_encode_c:
-            c = self.c_encoding(c)
-        out = x
-        for down in self.down_blocks:
-            out, _ = down(out, c)
-        out = add_coord_channels(out, self.ae_break_dims)
-        out = self.bottleneck(out)
-        return out
-
-    # TODO: write decode func
 
 class CylindricalAutoEncoder(nn.Module):
     """
@@ -366,7 +357,7 @@ class CylindricalAutoEncoder(nn.Module):
 
         # bottleneck
         out = self.bottleneck(
-            add_coords_channels(out,break_dims=self.break_dims)
+            add_coord_channels(out,break_dims=self.break_dims)
         )
 
         # up path
@@ -375,7 +366,7 @@ class CylindricalAutoEncoder(nn.Module):
 
         # output
         out = self.output_layer(
-            add_coords_channels( out, break_dims=self.break_dims)
+            add_coord_channels( out, break_dims=self.break_dims)
         )
 
         return out

@@ -84,8 +84,12 @@ class AE(GenerativeModel):
         self.save_sample(samples, conditions, name="_ae_reco")
         evaluate.run_from_py(samples, conditions, self.doc, self.params)
 
-    def get_latent(self, x):
-        with torch.no_grad():
-            x, condition, weights = self.get_conditions_and_input(x)
-            z = self.net.encode(x, condition)
-        return z.detach().cpu(), condition.detach().cpu()
+    @torch.no_grad()
+    def encode(self, x, c):
+        c = self.net.c_encoding(c)
+        return self.net.encode(x, c)
+
+    @torch.no_grad()
+    def decode(self, x, c):
+        c = self.net.c_encoding(c)
+        return self.net.decode(x, c)        

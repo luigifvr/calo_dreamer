@@ -81,6 +81,14 @@ class GenerativeModel(nn.Module):
         # init preprocessing
         self.transforms = get_transformations(params.get('transforms', None), doc=self.doc)
 
+        # load autoencoder for latent modelling
+        self.ae_dir = get(self.params, "autoencoder", None)
+        if self.ae_dir is None:
+            self.latent = False
+        else:
+            self.ae = self.load_other(self.ae_dir, model_class='AE')
+            self.latent = True
+        
     def build_net(self):
         pass
 
@@ -367,26 +375,11 @@ class GenerativeModel(nn.Module):
         if self.params['model_type'] == 'shape': # sample u_i's if self is a shape model
             # load energy model
             energy_model = self.load_other(self.params['energy_model'])
-            energy_model.eval()
 
             # sample us
             u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
             ]).to(self.device)
-
-            # # post-process u-samples according to energy config
-            # dummy = torch.empty(1, 1)
-            # for fn in energy_model.transforms[:0:-1]: # skip NormalizeByElayer
-            #     u_samples, dummy = fn(u_samples, dummy, rev=True)
-            
-            # # pre-process u-samples according to shape config
-            # # TODO: Is there a cleaner way to do this but without instantiating voxel-sized tensor?
-            # for fn in self.transforms:
-            #     if fn.__class__.__name__ == 'ExclusiveLogitTransform':
-            #         u_samples, dummy = fn(u_samples, dummy)
-            #     elif fn.__class__.__name__ == 'StandardizeFromFile':
-            #         u_samples -= fn.mean[-u_samples.shape[1]:].to(self.device)
-            #         u_samples /= fn.std[-u_samples.shape[1]:].to(self.device)
 
             transformed_cond = torch.cat([transformed_cond, u_samples], dim=1)
             transformed_cond_loader = DataLoader(
@@ -522,14 +515,31 @@ class GenerativeModel(nn.Module):
         #self.optim.load_state_dict(state_dicts["opt"])
         self.net.to(self.device)
 
-    def load_other(self, model_dir):
+    def load_other(self, model_dir, model_class='TBD'):
         """ Load a different model (e.g. to sample u_i's)"""
 
+        # choose model
+        if model_class == 'TBD':
+            Model = self.__class__
+        elif model_class == 'AE':
+            from Models import AE
+            Model = AE
+
+        # get params
         with open(os.path.join(model_dir, 'params.yaml')) as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
+
+        # load model
         doc = Documenter(None, existing_run=model_dir, read_only=True)
-        other = self.__class__(params, self.device, doc)
-        state_dicts = torch.load(os.path.join(model_dir, 'model.pt'), map_location=self.device)
+        other = Model(params, self.device, doc)
+        state_dicts = torch.load(
+            os.path.join(model_dir, 'model.pt'), map_location=self.device
+        )
         other.net.load_state_dict(state_dicts["net"])
         
+        # use eval mode and freeze weights
+        other.eval()
+        for p in other.parameters():
+            p.requires_grad = False
+
         return other

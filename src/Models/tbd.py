@@ -64,6 +64,10 @@ class TBD(GenerativeModel):
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
         
+        if self.latent:
+            # encode x into autoencoder latent space
+            x = self.ae.encode(x, condition)
+
         # t = self.distribution.sample((x.size(0),1)).to(x.device)
         t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
@@ -126,13 +130,17 @@ class TBD(GenerativeModel):
             #                  options={"step_size": 0.01}
             #                  ).detach().cpu().numpy()
 
-            x_t = solver(
+            sample = solver(
                 function, x_T,
                 torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
                 **self.params.get("solver_kwargs", {})
-            )
+            )[-1]
+
+            if self.latent:
+                # decode the generated sample
+                sample = self.ae.decode(sample, batch)
             
-        return x_t[-1].detach().cpu()
+        return sample.detach().cpu()
 
     def invert_n(self, samples):
         """

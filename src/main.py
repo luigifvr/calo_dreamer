@@ -3,11 +3,9 @@ import os
 import shutil
 import yaml
 import torch
-import numpy as np
+import Models
 
 from documenter import Documenter
-from Models import *
-from Models.tbd import TBD
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -45,7 +43,12 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    model = TBD(params, device, doc)
+    model = params.get("model", "TBD")
+    try:
+        model = getattr(Models, model)(params, device, doc)
+    except AttributeError:
+        raise NotImplementedError(f"build_model: Model class {model} not recognised")
+
     if not args.plot:
         model.run_training()
     else:
