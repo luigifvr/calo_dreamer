@@ -260,8 +260,8 @@ class UNet(nn.Module):
 
         # Output layer
         self.output_layer = nn.Conv3d(
-            in_channels=level_channels[0]+len(self.break_dims), out_channels=1,
-            kernel_size=(1, 1, 1)
+            in_channels=level_channels[0]+len(self.break_dims),
+            out_channels=self.out_channels, kernel_size=(1, 1, 1)
         )
 
         self.kl = torch.zeros(())
@@ -571,8 +571,8 @@ class CylindricalUNet(nn.Module):
 
         # Output layer
         self.output_layer = nn.Conv3d(
-            in_channels=level_channels[0]+len(self.break_dims), out_channels=1,
-            kernel_size=(1, 1, 1)
+            in_channels=level_channels[0]+len(self.break_dims),
+            out_channels=self.out_channels, kernel_size=(1, 1, 1)
         )
 
         self.kl = torch.zeros(())
