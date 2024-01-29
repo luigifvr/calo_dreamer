@@ -1,11 +1,6 @@
 run_name: d2_latent_test
 dtype: float32
 
-# Model
-model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
-autoencoder: /home/aore/calo_dreamer/results/20240128_231347_d2_ae
-
 # Data
 hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
 eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
@@ -17,43 +12,12 @@ eval_dataset: "2"
 eval_cut: 15.15e-3
 shape: [4, 15, 7, 7] # shape of the autoencoder embedding
 
-# TODO: Pull transforms straight from ae model
-transforms: { # Use the same transforms as the autoencoder
-    NormalizeByElayer: {
-      ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
-      xml_file: electron
-    },
-    LogEnergy: {},
-    ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
-    AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
-}
-
-# Training
-lr: 1.e-3
-max_lr: 1.e-3
-batch_size: 2000
-validate_every: 10
-use_scheduler: True
-lr_scheduler: one_cycle_lr
-weight_decay: 0.001
-betas: [0.9, 0.999]
-n_epochs: 500
-cycle_epochs: 2000
-cycle_pct_start: 0.1
-save_interval: 100_001
-
-# Sampling
-sample_periodically: False
-sample_every: 10
-sample_every_n_samples: 1001
-solver_kwargs: {method: midpoint, options: {step_size: 0.02}}
-
-# Network
+# Model
+model_type: shape
 network: UNet
 condition_dim: 46
-in_channels: 4 # of channels in the AE embedding
-out_channels: 4 # of channels in the AE embedding
+in_channels: 4 # number of AE embedding channels
+out_channels: 4 # number of AE embedding channels
 level_channels: [32, 64, 128]
 level_kernels: [3, 3]
 level_strides: [2, 2]
@@ -63,3 +27,27 @@ encode_t: True
 encode_t_dim: 100
 encode_c: True
 encode_c_dim: 100
+
+# Secondary models
+energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
+autoencoder: /home/aore/calo_dreamer/results/20240128_231347_d2_ae
+
+# Training
+lr: 1.e-3
+max_lr: 1.e-3
+batch_size: 2000
+validate_every: 5
+use_scheduler: True
+lr_scheduler: one_cycle_lr
+weight_decay: 0.001
+betas: [0.9, 0.999]
+n_epochs: 500
+cycle_epochs: 500
+cycle_pct_start: 0.1
+save_interval: 100_001
+
+# Sampling
+sample_periodically: False
+sample_every: 10
+sample_every_n_samples: 1001
+solver_kwargs: {method: midpoint, options: {step_size: 0.02}}

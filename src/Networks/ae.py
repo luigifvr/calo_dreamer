@@ -271,7 +271,6 @@ class AutoEncoder(nn.Module):
         out = z
         for up in self.up_blocks:
             out = up(out, residual=None, condition=c)
-
         out = add_coord_channels(out, self.ae_break_dims)
         out = self.output_layer(out)
         

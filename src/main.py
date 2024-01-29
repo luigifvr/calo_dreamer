@@ -54,7 +54,10 @@ def main():
     else:
         if args.generate:
             model.load(args.epoch)
-            x, c = model.sample_n()
+            if params.get("reconstruct", False):
+                x, c = model.reconstruct_n()
+            else:
+                x, c = model.sample_n()
             model.plot_samples(x, c, name=f"{args.epoch}")
             #model.eval_samples(x, c, name=f"{args.epoch}")
         else:

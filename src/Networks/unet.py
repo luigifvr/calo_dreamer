@@ -184,7 +184,6 @@ class UNet(nn.Module):
                   encode_t_scale -- Scale for the Gaussian Fourier projection
                   encode_c       -- Whether or not to embed the conditional input
                   encode_c_dim   -- Dimension of the condition embedding            
-                  activation     -- Activation function for hidden layers
                   bayesian       -- Whether or not to use bayesian layers
     """
 
@@ -206,7 +205,6 @@ class UNet(nn.Module):
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
-            'activation': nn.SiLU(),
             'bayesian': False,
         }
 
@@ -502,7 +500,6 @@ class CylindricalUNet(nn.Module):
                   encode_t_scale -- Scale for the Gaussian Fourier projection
                   encode_c       -- Whether or not to embed the conditional input
                   encode_c_dim   -- Dimension of the condition embedding
-                  activation     -- Activation function for hidden layers
                   bayesian       -- Whether or not to use bayesian layers
     """
 
@@ -524,7 +521,6 @@ class CylindricalUNet(nn.Module):
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
-            'activation': nn.SiLU(),
             'bayesian': False,
         }
 

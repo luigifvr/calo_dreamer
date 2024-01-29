@@ -91,21 +91,14 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        # batch = batch[:, None] # moved to before sample_batch call
         dtype = batch.dtype
         device = batch.device
 
         x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            # t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
-            # print(x_t.shape)
-            # print(t_torch.shape)
-            # print(batch.shape)
             t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
-            v = self.net(x_t, t_torch, batch)
-
-            return v
+            return self.net(x_t, t_torch, batch)
 
         with torch.no_grad():
             solver = sdeint if self.params.get("use_sde", False) else odeint
