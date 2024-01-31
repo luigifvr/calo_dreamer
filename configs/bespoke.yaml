@@ -6,7 +6,7 @@ shape: [1, 45, 16, 9]
 
 # Solver
 model: BespokeMidpoint
-num_steps: 10 # number of integration steps (NFE varies with base solver)
+num_steps: 16 # number of integration steps (NFE varies with base solver)
 truth_tols: # setting for the dopri5 'truth' solver
   atol: 1.e-5
   rtol: 1.e-5
@@ -15,9 +15,9 @@ truth_tols: # setting for the dopri5 'truth' solver
 shape_model: /home/aore/calo_dreamer/results/20240124_211803_d2_2000_epoch_shape_model
 
 # Training
-iterations: 1000
-batch_size: 50
-lr: 1.e-3
+iterations: 2000
+batch_size: 100
+lr: 5.e-4
 betas: [0.9, 0.999]
 
 # Sampling
