@@ -139,3 +139,46 @@ def get_transformations(transforms_list, doc=None):
             kwargs['model_dir'] = doc.basedir
         func.append(getattr(transforms, name)(**kwargs))
     return func
+
+def set_scheduler(optimizer, params, steps_per_epoch=1):
+    lr_sched_mode = params.get("lr_scheduler", "reduce_on_plateau")
+
+    if lr_sched_mode == "step":
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size = params["lr_decay_epochs"],
+            gamma = params["lr_decay_factor"],
+        )
+    elif lr_sched_mode == "reduce_on_plateau":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, factor = 0.8, patience = 50, cooldown = 100,
+            threshold = 5e-5, threshold_mode = "rel", verbose=True
+        )
+    elif lr_sched_mode == "one_cycle_lr":
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer, params.get("max_lr", params["lr"]*10),
+            epochs = params.get("cycle_epochs") or params["n_epochs"],
+            steps_per_epoch=steps_per_epoch,
+            pct_start=params.get("cycle_pct_start", 0.3)
+        )
+    elif lr_sched_mode == "cycle_lr":
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer, base_lr = params.get("lr", 1.0e-4),
+            max_lr = params.get("max_lr", params["lr"]*10),
+            step_size_up= params.get("step_size_up", 2000),
+            mode = params.get("cycle_mode", "triangular"),
+            cycle_momentum = False,
+        )
+    elif lr_sched_mode == "multi_step_lr":
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=[2730, 8190, 13650, 27300], gamma=0.5
+        )
+    elif lr_sched_mode == "CosineAnnealing":
+        n_epochs = params.get("cycle_epochs") or params["n_epochs"]
+        eta_min = params.get( "eta_min", 0)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=n_epochs * steps_per_epoch, eta_min=eta_min
+        )
+    else:
+        raise ValueError(f"scheduler f\"{lr_sched_mode}\" not recognised.")
+
+    return scheduler
