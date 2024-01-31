@@ -140,55 +140,7 @@ class GenerativeModel(nn.Module):
                 eps = params.get("eps", 1e-6),
                 weight_decay = params.get("weight_decay", 0.)
                 )
-
-        self.lr_sched_mode = params.get("lr_scheduler", "reduce_on_plateau")
-        if self.lr_sched_mode == "step":
-            self.scheduler = torch.optim.lr_scheduler.StepLR(
-                    self.optimizer,
-                    step_size = params["lr_decay_epochs"],
-                    gamma = params["lr_decay_factor"],
-                    )
-        elif self.lr_sched_mode == "reduce_on_plateau":
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    self.optimizer,
-                    factor = 0.8,
-                    patience = 50,
-                    cooldown = 100,
-                    threshold = 5e-5,
-                    threshold_mode = "rel",
-                    verbose=True
-                    )
-        elif self.lr_sched_mode == "one_cycle_lr":
-            self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
-                self.optimizer,
-                params.get("max_lr", params["lr"]*10),
-                epochs = params.get("cycle_epochs") or params["n_epochs"],
-                steps_per_epoch=steps_per_epoch,
-                pct_start=params.get("cycle_pct_start", 0.3)
-                )
-        elif self.lr_sched_mode == "cycle_lr":
-            self.scheduler = torch.optim.lr_scheduler.CyclicLR(
-                self.optimizer,
-                base_lr = params.get("lr", 1.0e-4),
-                max_lr = params.get("max_lr", params["lr"]*10),
-                step_size_up= params.get("step_size_up", 2000),
-                mode = params.get("cycle_mode", "triangular"),
-                cycle_momentum = False,
-                    )
-        elif self.lr_sched_mode == "multi_step_lr":
-            self.scheduler = torch.optim.lr_scheduler.MultiStepLR(
-                    self.optimizer,
-                    milestones=[2730, 8190, 13650, 27300],
-                    gamma=0.5
-                    )
-        elif self.lr_sched_mode == "CosineAnnealing":
-            n_epochs = params.get("cycle_epochs") or params["n_epochs"]
-            eta_min = params.get( "eta_min", 0)
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer=self.optimizer,
-                T_max=n_epochs * steps_per_epoch,
-                eta_min=eta_min
-            )
+        self.scheduler = set_scheduler(self.optimizer, params, steps_per_epoch)
 
     def run_training(self):
 
@@ -343,6 +295,7 @@ class GenerativeModel(nn.Module):
                 bay_layer.random = None
         sample = []
 
+        # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
         Einc = torch.tensor(
             # Ayo: TODO: Handle single energy option for datasets 2 & 3
             10**np.random.uniform(3, 6, size=10**5) 
@@ -413,9 +366,10 @@ class GenerativeModel(nn.Module):
     def sample_batch(self, batch):
         pass
 
-    def plot_samples(self, samples, conditions, name="", energy=None):
+    def plot_samples(self, samples, conditions, name="", energy=None, doc=None):
         
         transforms = self.transforms
+        if doc is None: doc = self.doc
 
         if self.params['model_type'] == 'energy':
             reference = CaloChallengeDataset(
@@ -439,12 +393,12 @@ class GenerativeModel(nn.Module):
             plot_ui_dists(
                 samples.detach().cpu().numpy(),
                 reference.detach().cpu().numpy(),
-                documenter=self.doc
+                documenter=doc
             )
             evaluate.eval_ui_dists(
                 samples.detach().cpu().numpy(),
                 reference.detach().cpu().numpy(),
-                documenter=self.doc,
+                documenter=doc,
                 params=self.params,
             )
         else:
@@ -455,27 +409,28 @@ class GenerativeModel(nn.Module):
             samples = samples.detach().cpu().numpy()
             conditions = conditions.detach().cpu().numpy()
 
-            self.save_sample(samples, conditions, name=name)
+            self.save_sample(samples, conditions, name=name, doc=doc)
             #script_args = (
             #    f"-i {self.doc.basedir}/samples{name}.hdf5 "
             #    f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
             #    f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
             #) + (f" --energy {energy}" if energy is not None else '')
             #evaluate.main(script_args.split())
-            evaluate.run_from_py(samples, conditions, self.doc, self.params)
+            evaluate.run_from_py(samples, conditions, doc, self.params)
 
-    def plot_saved_samples(self, name="", energy=None):
+    def plot_saved_samples(self, name="", energy=None, doc=None):
+        if doc is None: doc = self.doc
         script_args = (
-            f"-i {self.doc.basedir}/samples{name}.hdf5 "
+            f"-i {doc.basedir}/samples{name}.hdf5 "
             f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
-            f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
+            f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())
 
-    def save_sample(self, sample, energies, name=""):
+    def save_sample(self, sample, energies, name="", doc=None):
         """Save sample in the correct format"""
-    
-        save_file = h5py.File(self.doc.get_file(f'samples{name}.hdf5'), 'w')
+        if doc is None: doc = self.doc
+        save_file = h5py.File(doc.get_file(f'samples{name}.hdf5'), 'w')
         save_file.create_dataset('incident_energies', data=energies)
         save_file.create_dataset('showers', data=sample)
         save_file.close()            
@@ -509,7 +464,8 @@ class GenerativeModel(nn.Module):
 
         model = params.get("model", "TBD")
         try:
-            other = getattr(Models, model)(params, self.device, None)
+            doc = Documenter(None, existing_run=model_dir, read_only=True)
+            other = getattr(Models, model)(params, self.device, doc)
         except AttributeError:
             raise NotImplementedError(f"build_model: Model class {model} not recognised")
 
