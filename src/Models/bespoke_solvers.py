@@ -144,8 +144,11 @@ class BespokeSolver(nn.Module):
 
     def load_flow_models(self):
         """Load the flow model defining the vector field to be integrated."""
+        
+        # read flow parameters
         with open(os.path.join(self.flow_dir, 'params.yaml')) as f:
             flow_params = yaml.load(f, Loader=yaml.FullLoader)
+            flow_params['eval_mode'] = self.params.get('eval_mode', 'all')
         flow_doc = Documenter(None, existing_run=self.flow_dir, read_only=True)
         self.flow = TBD(flow_params, self.device, flow_doc)
         flow_state_dicts = torch.load(
@@ -231,17 +234,8 @@ class BespokeSolver(nn.Module):
 
         # generate and plot samples
         if self.params.get('sample', True):
-            print("generate_samples: Start generating samples", flush=True)
-            t_0 = time.time()
             samples, c = self.sample_n()
-            t_1 = time.time()
-            sampling_time = t_1 - t_0
-            self.params["sampling_time"] = sampling_time
-            print(
-                f"generate_samples: Finished generating {len(samples)} "
-                f" samples after {sampling_time} s.", flush=True
-            )
-            self.flow.plot_samples(samples=samples, conditions=c, doc=self.doc)     
+            self.plot_samples(samples=samples, conditions=c, doc=self.doc)     
 
     @torch.no_grad()
     def solve(self, cond=None, x0=None):
@@ -260,17 +254,37 @@ class BespokeSolver(nn.Module):
 
     @torch.no_grad()
     def sample_n(self):
-        
-        cond_generator = self.condition_generator(
-            self.params.get('n_batches_sample', 10),
-            self.params.get('batch_size_sample', 10000)
-        )
+        print("generate_samples: Start generating samples", flush=True)
+        t_0 = time.time()
+
+        # initialize condition generator
+        n_batches = self.params.get('n_batches_sample', 10)
+        batch_size = self.params.get('batch_size_sample', 10000)
+        cond_generator = self.condition_generator(n_batches, batch_size)
+
+        # sample model
         conds, samples = [], []
         for c in cond_generator:
             samples.append(self.solve(c).cpu().squeeze(0))
             conds.append(c.cpu())
+        
+        # report timing
+        t_1 = time.time()
+        sampling_time = t_1 - t_0
+        self.params["sampling_time"] = sampling_time
+        print(f"generate_samples: Finished generating {n_batches*batch_size} "
+              f" samples after {sampling_time} s.", flush=True)
 
         return torch.vstack(samples), torch.vstack(conds)
+    
+    def load(self, epoch=None):
+        self.load_state_dict(torch.load(
+            self.doc.get_file(f"model{epoch or ''}.pt"),
+            map_location=self.device
+        )['solver_params'])
+
+    def plot_samples(self, samples, conditions, **kwargs):
+        self.flow.plot_samples(samples, conditions, doc=self.doc, **kwargs)
 
 class BespokeEuler(BespokeSolver):
     """A concrete bespoke solver for the Euler (RK1) method."""
