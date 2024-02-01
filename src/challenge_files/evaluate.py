@@ -390,7 +390,7 @@ def check_file(given_file, arg, which=None):
     print("Checking if {} file has the correct form: DONE \n".format(
         which if which is not None else 'provided'))
 
-def extract_shower_and_energy(given_file, which, single_energy=None):
+def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1):
     """ reads .hdf5 file and returns samples and their energy """
     print("Extracting showers from {} file ...".format(which))
     if single_energy is not None:
@@ -398,8 +398,8 @@ def extract_shower_and_energy(given_file, which, single_energy=None):
         energy = given_file["incident_energies"][:][energy_mask].reshape(-1, 1)
         shower = given_file["showers"][:][energy_mask.flatten()]
     else:
-        shower = given_file['showers'][:]
-        energy = given_file['incident_energies'][:]
+        shower = given_file['showers'][:max_len]
+        energy = given_file['incident_energies'][:max_len]
     print("Extracting showers from {} file: DONE.\n".format(which))
     return shower, energy
 
@@ -548,8 +548,10 @@ def run_from_py(sample, energy, doc, params):
     reference_file = h5py.File(args.reference_file, 'r')
     check_file(reference_file, args, which='reference')
 
-    reference_shower, reference_energy = extract_shower_and_energy(reference_file,
-                                                                   which='reference', single_energy=args.energy)
+    reference_shower, reference_energy = extract_shower_and_energy(
+        reference_file, which='reference', single_energy=args.energy,
+        max_len=len(sample)
+    )
     reference_shower[reference_shower<args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle,
                                               filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(

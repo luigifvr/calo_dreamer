@@ -9,7 +9,7 @@ import yaml
 from abc import abstractmethod
 from documenter import Documenter
 from Models import TBD
-from Util.util import set_scheduler
+from Util.util import set_scheduler, load_params
 from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint
 
@@ -99,19 +99,19 @@ class BespokeSolver(nn.Module):
     def lipschitz_u(s, s_dot, t_dot, L_tau):
         return abs(s_dot)/s + t_dot*L_tau
 
-
     def flow_fn(self, x, t, c):
         """A wrapper for self.flow.net that correctly shapes things."""
 
         orig_shape = x.shape
-        batch_size = x.shape[-len(self.shape)-1] # TODO: more compact way to get shape?
+        batch_size = x.shape[-len(self.shape)-1]
         t = t.repeat_interleave(batch_size).view(-1,1)
         
         if len(x.shape) > len(self.shape)+1:
+            # running in parallel (training)
             c = c.repeat(x.shape[0], 1)
             x = x.view(-1, *self.shape)
-        
-        return self.flow.net(x, t, c).view(*orig_shape) # TODO: define self.net somewhere
+
+        return self.flow.net(x, t, c).view(*orig_shape)
 
     def rmse_bound(self, x, cond=None):
 
@@ -142,13 +142,36 @@ class BespokeSolver(nn.Module):
         
         return self.rmse_bound(x_aux, cond)
 
+    @torch.no_grad()
+    def solve(self, cond=None, x0=None):
+        """Alg. 2 and Eq. 17"""
+
+        if x0 is None:
+            # assume initial state x0 follows standard normal
+            x0 = torch.randn((cond.shape[0], *self.shape), device=self.device)
+        
+        with torch.no_grad():
+            x_next = x0
+            for i in range(self.num_steps):
+                x_next = self.step(x_next, cond, r=i)
+        
+        return x_next
+    
+    def condition_generator(self, iterations, batch_size):
+        """A generator for sampling conditions during training and inference."""
+        for _ in range(iterations):
+            Eincs = torch.rand([batch_size, 1], device=self.device) # Assumes u_model expects Einc uniform in [0,1]
+            with torch.no_grad():
+                u_samples = self.u_model.sample_batch(Eincs).to(self.device) # TODO: Update sample batch so that it doesn't move to cpu!
+            yield torch.cat([Eincs, u_samples], dim=1) 
+
     def load_flow_models(self):
         """Load the flow model defining the vector field to be integrated."""
         
         # read flow parameters
-        with open(os.path.join(self.flow_dir, 'params.yaml')) as f:
-            flow_params = yaml.load(f, Loader=yaml.FullLoader)
-            flow_params['eval_mode'] = self.params.get('eval_mode', 'all')
+        flow_params = load_params(os.path.join(self.flow_dir, 'params.yaml'))
+        flow_params['eval_mode'] = self.params.get('eval_mode', 'all')
+        # initialioze flow
         flow_doc = Documenter(None, existing_run=self.flow_dir, read_only=True)
         self.flow = TBD(flow_params, self.device, flow_doc)
         flow_state_dicts = torch.load(
@@ -158,15 +181,8 @@ class BespokeSolver(nn.Module):
         self.flow.eval()
         for p in self.flow.parameters():
             p.requires_grad=False
+        # initialize energy model for conditions
         self.u_model = self.flow.load_other(flow_params['energy_model'])
-
-    def condition_generator(self, iterations, batch_size):
-        """A generator for sampling conditions during training and inference."""
-        for _ in range(iterations):
-            Eincs = torch.rand([batch_size, 1], device=self.device) # Assumes u_model expects Einc uniform in [0,1]
-            with torch.no_grad():
-                u_samples = self.u_model.sample_batch(Eincs).to(self.device) # TODO: Update sample batch so that it doesn't move to cpu!
-            yield torch.cat([Eincs, u_samples], dim=1)        
 
     def prepare_training(self):
         
@@ -235,22 +251,7 @@ class BespokeSolver(nn.Module):
         # generate and plot samples
         if self.params.get('sample', True):
             samples, c = self.sample_n()
-            self.plot_samples(samples=samples, conditions=c, doc=self.doc)     
-
-    @torch.no_grad()
-    def solve(self, cond=None, x0=None):
-        """Alg. 2 and Eq. 17"""
-
-        if x0 is None:
-            # assume initial state x0 follows standard normal
-            x0 = torch.randn((cond.shape[0], *self.shape), device=self.device)
-        
-        with torch.no_grad():
-            x_next = x0
-            for i in range(self.num_steps):
-                x_next = self.step(x_next, cond, r=i)
-        
-        return x_next
+            self.plot_samples(samples=samples, conditions=c)     
 
     @torch.no_grad()
     def sample_n(self):
@@ -262,7 +263,7 @@ class BespokeSolver(nn.Module):
         batch_size = self.params.get('batch_size_sample', 10000)
         cond_generator = self.condition_generator(n_batches, batch_size)
 
-        # sample model
+        # sample model in batches
         conds, samples = [], []
         for c in cond_generator:
             samples.append(self.solve(c).cpu().squeeze(0))
@@ -356,12 +357,12 @@ class BespokeMidpoint(BespokeSolver):
 
         if r is None: # parallel (for training)
             s, s_half, s_plus = self.s[:-1:2], self.s[1::2], self.s[2::2]
-            t, t_half, t_plus = self.t[:-1:2], self.t[1::2], self.t[2::2]
+            t, t_half = self.t[:-1:2], self.t[1::2]
             s_dot, s_dot_half = self.s_dot[::2], self.s_dot[1::2]
             t_dot, t_dot_half = self.t_dot[::2], self.t_dot[1::2]
         else: # single (for sampling)
             s, s_half, s_plus = self.s[2*r], self.s[2*r+1], self.s[2*r+2]
-            t, t_half, t_plus = self.t[2*r], self.t[2*r+1], self.t[2*r+2]
+            t, t_half = self.t[2*r], self.t[2*r+1]
             s_dot, s_dot_half = self.s_dot[2*r], self.s_dot[2*r+1]
             t_dot, t_dot_half = self.t_dot[2*r], self.t_dot[2*r+1]
 
