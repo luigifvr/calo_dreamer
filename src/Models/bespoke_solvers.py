@@ -162,7 +162,7 @@ class BespokeSolver(nn.Module):
         for _ in range(iterations):
             Eincs = torch.rand([batch_size, 1], device=self.device) # Assumes u_model expects Einc uniform in [0,1]
             with torch.no_grad():
-                u_samples = self.u_model.sample_batch(Eincs).to(self.device) # TODO: Update sample batch so that it doesn't move to cpu!
+                u_samples = self.u_model.sample_batch(Eincs)
             yield torch.cat([Eincs, u_samples], dim=1) 
 
     def load_flow_models(self):

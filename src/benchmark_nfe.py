@@ -52,6 +52,7 @@ def benchmark(args):
         params['eval_mode'] = args.eval_mode
         model = Models.TBD(params, device=device,
             doc=Documenter(None, existing_run=model_dir, read_only=True))
+        model.load()
         # set to eval mode and freeze weights
         model.eval()
         for p in model.parameters():
@@ -73,12 +74,12 @@ def benchmark(args):
                 doc=Documenter(None, existing_run=args.bespoke_dir, read_only=True),
                 device=device
             )
-            sample = solver.solve(cond).cpu()
+            sample = solver.solve(cond)
         else:
             model.params['solver_kwargs'] = (
-                {'options': {'step_size': 1/args.steps}} 
+                {'method': args.solver, 'options': {'step_size': 1/args.steps}} 
                 if args.solver in FIXED_SOLVERS else
-                {'atol': args.tol, 'rtol': args.tol}
+                {'method': args.solver, 'atol': args.tol, 'rtol': args.tol}
             )
             sample = models['shape'].sample_batch(cond)
             # define wrapper function to pass to solvers

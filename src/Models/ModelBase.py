@@ -323,7 +323,7 @@ class GenerativeModel(nn.Module):
             # sample us
             u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ]).to(self.device)
+            ])
 
             # # post-process u-samples according to energy config
             # dummy = torch.empty(1, 1)
@@ -344,9 +344,9 @@ class GenerativeModel(nn.Module):
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = torch.vstack([self.sample_batch(c).cpu() for c in transformed_cond_loader])
 
-        return sample, transformed_cond.detach().cpu()
+        return sample, transformed_cond.cpu()
     
     def reconstruct_n(self,):
         recos = []
