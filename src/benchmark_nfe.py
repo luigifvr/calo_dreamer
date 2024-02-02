@@ -75,22 +75,25 @@ def benchmark(args):
             )
             sample = solver.solve(cond).cpu()
         else:
-            # define wrapper function to pass to solvers
-            def flow_fn(t, x):
-                t = t.repeat((x.shape[0],1)).to(device)
-                return models['shape'].net(x, t, cond)
-    
-            y0 = torch.randn((args.n_samples, *models['shape'].shape),
-                    device=device)
-            sol_times = torch.tensor([0, 1], dtype=torch.float32).to(device)
-            solver_kwargs = (
+            model.params['solver_kwargs'] = (
                 {'options': {'step_size': 1/args.steps}} 
                 if args.solver in FIXED_SOLVERS else
                 {'atol': args.tol, 'rtol': args.tol}
             )
-            with torch.no_grad():
-                sample = odeint(flow_fn, y0, sol_times, method=args.solver,
-                    **solver_kwargs)[-1]
+            sample = models['shape'].sample_batch(cond)
+            # define wrapper function to pass to solvers
+            # def flow_fn(t, x):
+            #     t = t.repeat((x.shape[0],1)).to(device)
+            #     return models['shape'].net(x, t, cond)
+    
+            # y0 = torch.randn((args.n_samples, *models['shape'].shape),
+            #         device=device)
+            # sol_times = torch.tensor([0, 1], dtype=torch.float32).to(device)
+            # with torch.no_grad():
+            #     sample = odeint(flow_fn, y0, sol_times, method=args.solver,
+            #         **solver_kwargs)[-1]
+        
+                    # postprocess
         
         # post-process
         for fn in models['shape'].transforms[::-1]:
