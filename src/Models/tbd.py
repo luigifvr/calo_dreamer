@@ -51,10 +51,8 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        # x = input[0].clone()
         condition = input[1]
         weights = None
-        # return x, condition, weights
         return input[0], condition, weights
 
     def batch_loss(self, x):
