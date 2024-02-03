@@ -56,8 +56,8 @@ class Conv3DBlock(nn.Module):
             kernel_size=3, padding=1
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
-        self.act = nn.ReLU()
-        #self.act = nn.SiLU()
+        #self.act = nn.ReLU()
+        self.act = nn.SiLU()
 
         self.bottleneck = bottleneck
         if not bottleneck:
@@ -131,8 +131,8 @@ class UpConv3DBlock(nn.Module):
             kernel_size=up_kernel, stride=up_stride, padding=up_crop,
             output_padding=output_padding
         )
-        self.act = nn.ReLU()
-        #self.act = nn.SiLU()
+        #self.act = nn.ReLU()
+        self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
@@ -196,6 +196,8 @@ class AutoEncoder(nn.Module):
             'ae_encode_c_dim': 32,
             'ae_break_dims': None,
             'activation': nn.SiLU(),
+            'ae_kl': False,
+            'ae_latent_dim': 100,
         }
 
         for k, p in defaults.items():
@@ -225,10 +227,30 @@ class AutoEncoder(nn.Module):
         ])
 
         # Bottleneck block
-        self.bottleneck = nn.Conv3d(
-                in_channels=level_channels[-1]+len(self.ae_break_dims),
-                out_channels=bottle_channel, kernel_size=(1,1,1)
-        )
+        if self.ae_kl:
+            self.conv_mu = nn.Conv3d(
+                    in_channels=bottle_channel, out_channels=bottle_channel,
+                    kernel_size=(1,1,1)
+                    )
+            self.conv_logvar = nn.Conv3d(
+                    in_channels=bottle_channel, out_channels=bottle_channel,
+                    kernel_size=(1,1,1),
+                    )
+
+            self.bottleneck = nn.ModuleList([
+                nn.Conv3d(
+                    in_channels=level_channels[-1]+len(self.ae_break_dims),
+                    out_channels=bottle_channel, kernel_size=(1,1,1)
+                ),
+            ])
+
+        else:
+            self.bottleneck = nn.ModuleList([
+                nn.Conv3d(
+                    in_channels=level_channels[-1]+len(self.ae_break_dims),
+                    out_channels=bottle_channel, kernel_size=(1,1,1)
+                )
+            ])
 
         # Upsampling blocks
         self.up_blocks = nn.ModuleList([
@@ -263,7 +285,14 @@ class AutoEncoder(nn.Module):
         for down in self.down_blocks:
             out, _ = down(out, c)
         out = add_coord_channels(out, self.ae_break_dims)
-        out = self.bottleneck(out)
+        for btl in self.bottleneck:
+            out = btl(out)
+        if self.ae_kl:
+            mu = self.conv_mu(out)
+            logvar = self.conv_logvar(out)
+            #mu = out[:, :int(out.shape[1]/2)]
+            #logvar = out[:, int(out.shape[1]/2):]
+            return mu, logvar
         return out
 
     def decode(self, z, c=None):
@@ -276,6 +305,12 @@ class AutoEncoder(nn.Module):
         
         return torch.sigmoid(out)
 
+    def reparameterize(self, mu, logvar):
+        std = logvar.mul(0.5).exp_()
+        # return torch.normal(mu, std)
+        esp = torch.randn(*mu.size()).to(mu.device)
+        z = mu + std * esp
+        return z
 
 class CylindricalAutoEncoder(nn.Module):
     """
