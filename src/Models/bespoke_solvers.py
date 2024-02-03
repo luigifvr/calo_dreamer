@@ -9,7 +9,7 @@ import yaml
 from abc import abstractmethod
 from documenter import Documenter
 from Models import TBD
-from Util.util import set_scheduler, load_params
+from Util.util import load_params, set_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint
 
@@ -120,9 +120,9 @@ class BespokeSolver(nn.Module):
             (x[1:] - self.step(x[:-1], cond))**2, dim=list(range(2, x.ndim))
         )) 
         # Eq. 25
-        m = torch.cumprod(self.lipschitz, dim=0)
+        m = self.lipschitz[1:].flip([0]).cumprod(0).flip([0])
         
-        return (m*d.T).sum(dim=1)
+        return m @ d[:-1] + d[-1] # L_n set to 1
 
     def forward(self, cond=None, batch_size=None):
         """
@@ -174,10 +174,7 @@ class BespokeSolver(nn.Module):
         # initialioze flow
         flow_doc = Documenter(None, existing_run=self.flow_dir, read_only=True)
         self.flow = TBD(flow_params, self.device, flow_doc)
-        flow_state_dicts = torch.load(
-            os.path.join(self.flow_dir, 'model.pt'), map_location=self.device
-        )
-        self.flow.net.load_state_dict(flow_state_dicts['net'])
+        self.flow.load()
         self.flow.eval()
         for p in self.flow.parameters():
             p.requires_grad=False
@@ -371,8 +368,8 @@ class BespokeMidpoint(BespokeSolver):
         z = zx * x + zf * self.flow_fn(x, t, cond)
 
         h_on_s = self.h / s_plus
-        brace_z = (s_dot_half * h_on_s / s_half).view(*self.cast_shape)
-        brace_u = (t_dot_half * s_half * h_on_s).view(*self.cast_shape)
+        brace_z = (h_on_s * s_dot_half / s_half).view(*self.cast_shape)
+        brace_u = (h_on_s * t_dot_half * s_half).view(*self.cast_shape)
         u_half = self.flow_fn(z/s_half.view(*self.cast_shape), t_half, cond)
         brace = brace_z * z + brace_u * u_half
 

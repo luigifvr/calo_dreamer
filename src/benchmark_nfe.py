@@ -64,7 +64,7 @@ def benchmark(args):
         # generate condition
         Einc = torch.rand([args.n_samples, 1], device=device) # Assuming u_model expects Einc uniform in [0,1]
         with torch.no_grad():
-            u_samples = models['energy'].sample_batch(Einc).to(device) # TODO: Update sample batch so that it doesn't move to cpu!
+            u_samples = models['energy'].sample_batch(Einc)
         cond = torch.cat([Einc, u_samples], dim=1)
 
         # dispatch to chosen solver and generate sample
@@ -74,6 +74,7 @@ def benchmark(args):
                 doc=Documenter(None, existing_run=args.bespoke_dir, read_only=True),
                 device=device
             )
+            solver.load()
             sample = solver.solve(cond)
         else:
             model.params['solver_kwargs'] = (
@@ -82,19 +83,6 @@ def benchmark(args):
                 {'method': args.solver, 'atol': args.tol, 'rtol': args.tol}
             )
             sample = models['shape'].sample_batch(cond)
-            # define wrapper function to pass to solvers
-            # def flow_fn(t, x):
-            #     t = t.repeat((x.shape[0],1)).to(device)
-            #     return models['shape'].net(x, t, cond)
-    
-            # y0 = torch.randn((args.n_samples, *models['shape'].shape),
-            #         device=device)
-            # sol_times = torch.tensor([0, 1], dtype=torch.float32).to(device)
-            # with torch.no_grad():
-            #     sample = odeint(flow_fn, y0, sol_times, method=args.solver,
-            #         **solver_kwargs)[-1]
-        
-                    # postprocess
         
         # post-process
         for fn in models['shape'].transforms[::-1]:
@@ -107,21 +95,5 @@ def benchmark(args):
 
 if __name__ == '__main__':
     benchmark(args)
-    # if len(args.steps) > 1: # submit to queue
-    #     use_gpu = int('gpu' in args.queue)
-    #     setup_cmd = 'ml purge; source ~/setup_ml.sh; source ~/venvs/ml/bin/activate'
-    #     script_cmd = f'python ' + ' '.join(sys.argv)
-    #     steps_str = ' '.join(map(str, args.steps))
-    #     for step in args.steps:
-    #         cmd = (
-    #             f"sbatch -p {args.queue} --mem {args.memory} -N 1 -c 4 --gpus {int(use_gpu)}"
-    #             f" -t {args.time} -J [}] --wrap \"{setup_cmd}; {script_cmd}\""
-    #             f" -o {log_dir}/%x.out "
-    #         )
-    #     # script_cmd.replace()
-
-    #     print(args._get_args())
-    # else:
-          
 
         
