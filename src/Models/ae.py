@@ -20,6 +20,7 @@ class AE(GenerativeModel):
         self.lat_mean = None
         self.lat_std = None
         self.shape = self.params.get('ae_latent_shape')
+        self.kl = self.params.get('ae_kl')
         # parameters for autoencoder
 
     def build_net(self):
@@ -126,9 +127,6 @@ class AE(GenerativeModel):
     @torch.no_grad()
     def decode(self, x, c):
         c = self.net.c_encoding(c)
-        if self.params.get('ae_kl', False):
-            z = self.net.parameterize(x[0], x[1])
-            return self.net.decode(z, c)
         return self.net.decode(x, c)
 
     @torch.no_grad()

@@ -546,7 +546,7 @@ class GenerativeModel(nn.Module):
         state_dicts = torch.load(
             os.path.join(model_dir, 'model.pt'), map_location=self.device
         )
-        other.net.load_state_dict(state_dicts["net"], strict=False)
+        other.net.load_state_dict(state_dicts["net"])
         
         # use eval mode and freeze weights
         other.eval()
