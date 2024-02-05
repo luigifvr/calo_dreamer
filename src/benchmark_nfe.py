@@ -34,14 +34,26 @@ parser.add_argument('--eval_mode', default='cls-high')
 # parser.add_argument('-m', '--memory', default='32G')
 args = parser.parse_args()
 
+class SolveFunc:
+
+    def __init__(self, net, cond, device):
+        self.net = net
+        self.cond = cond
+        self.device = device
+        self.nfe = 0
+
+    def __call__(self, t, x):
+        self.nfe += 1
+        t = t.repeat((x.shape[0],1)).to(self.device)
+        return self.net(x, t, self.cond)
+
 def benchmark(args):
 
     assert (args.steps is None) ^ (args.tols is None), \
         "Exactly one of `steps` or `tols` must be set!"
     
     device = 'cuda' if torch.cuda.is_available() and ~args.no_cuda else 'cpu'
-    
-    precision = args.tol if args.solver in ADAPTIVE_SOLVERS else args.steps
+    precision = args.tols if args.solver in ADAPTIVE_SOLVERS else args.steps
     doc = Documenter(f'benchmark_{args.solver}_{precision}')
 
     # load shape and energy models
@@ -77,12 +89,24 @@ def benchmark(args):
             solver.load()
             sample = solver.solve(cond)
         else:
-            model.params['solver_kwargs'] = (
-                {'method': args.solver, 'options': {'step_size': 1/args.steps}} 
+            solve_fn = SolveFunc(models['shape'].net, cond, device)            
+            y0 = torch.randn((args.n_samples, *models['shape'].shape),
+                    device=device)            
+            times = torch.tensor([0, 1], dtype=torch.float32, device=device)
+            solver_kwargs = (
+                {'options': {'step_size': 1/args.steps}}
                 if args.solver in FIXED_SOLVERS else
-                {'method': args.solver, 'atol': args.tol, 'rtol': args.tol}
+                {'atol': args.tols, 'rtol': args.tols}
             )
-            sample = models['shape'].sample_batch(cond)
+            with torch.no_grad():
+                sample = odeint(solve_fn, y0, times, method=args.solver,
+                    **solver_kwargs)[-1]
+            # model.params['solver_kwargs'] = (
+            #     {'method': args.solver, 'options': {'step_size': 1/args.steps}} 
+            #     if args.solver in FIXED_SOLVERS else
+            #     {'method': args.solver, 'atol': args.tol, 'rtol': args.tol}
+            # )
+            # sample = models['shape'].sample_batch(cond)
         
         # post-process
         for fn in models['shape'].transforms[::-1]:
@@ -93,6 +117,11 @@ def benchmark(args):
         # classify
         evaluate.run_from_py(sample, cond, doc, models['shape'].params)
 
+        # TODO: Put this _before_ evaluate so that NFE is prepended...
+        if args.solver in ADAPTIVE_SOLVERS:
+            with open(doc.get_file('eval/classifier_cls-high_2.txt'), 'a') as f:
+                f.write(f"NFE: {solve_fn.nfe}\n")
+        
 if __name__ == '__main__':
     benchmark(args)
 
