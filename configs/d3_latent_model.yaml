@@ -32,12 +32,13 @@ encode_c_dim: 100
 # Secondary models
 energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
 # autoencoder: /home/aore/calo_dreamer/results/20240128_235248_d3_ae # factor ~2.6
-autoencoder: /home/aore/calo_dreamer/results/20240126_015618_d3_ae # factor 1.75
+autoencoder: /home/aore/calo_dreamer/results/20240205_041200_d3_ae # factor 1.75
 
 # Training
 lr: 1.e-3
-max_lr: 1.e-3
-batch_size: 500
+max_lr: 5.e-4
+div_factor: 100
+batch_size: 250
 validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr

@@ -172,7 +172,8 @@ class GenerativeModel(nn.Module):
                 params.get("max_lr", params["lr"]*10),
                 epochs = params.get("cycle_epochs") or params["n_epochs"],
                 steps_per_epoch=steps_per_epoch,
-                pct_start=params.get("cycle_pct_start", 0.3)
+                pct_start=params.get("cycle_pct_start", 0.3),
+                div_factor=params.get("div_factor", 25)
                 )
         elif self.lr_sched_mode == "cycle_lr":
             self.scheduler = torch.optim.lr_scheduler.CyclicLR(
