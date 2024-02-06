@@ -6,16 +6,16 @@ shape: [1, 45, 16, 9]
 
 # Solver
 model: BespokeMidpoint
-num_steps: 1 # number of integration steps (NFE varies with base solver)
+num_steps: 5 # number of integration steps (NFE varies with base solver)
 truth_tols: # setting for the dopri5 'truth' solver
   atol: 1.e-5
   rtol: 1.e-5
-# loss: LTE
 
 # Flow model
 shape_model: /home/aore/calo_dreamer/results/20240110_124434_d2_2000_epoch_shape_model_geom
 
 # Training
+loss: gte_bound
 iterations: 500
 batch_size: 50
 lr: 2.e-3

@@ -51,6 +51,11 @@ class BespokeSolver(nn.Module):
         self.L_tau = params.get('L_tau', 1.)
         self.truth_tols = params.get('truth_tols', None)
         self.cast_shape = [-1] + [1]*(1+len(self.shape))
+
+        self.loss = {
+            'lte': self.lte_loss,
+            'gte_bound': self.gte_bound_loss
+        }[params.get('loss', 'GTE_bound')]
         
         self.init_params()
         self.load_flow_models()
@@ -113,7 +118,7 @@ class BespokeSolver(nn.Module):
 
         return self.flow.net(x, t, c).view(*orig_shape)
 
-    def rmse_bound(self, x, cond=None):
+    def gte_bound_loss(self, x, cond=None):
 
         # Eq. 24
         d = torch.sqrt(torch.mean(
@@ -123,6 +128,15 @@ class BespokeSolver(nn.Module):
         m = self.lipschitz[1:].flip([0]).cumprod(0).flip([0])
         
         return m @ d[:-1] + d[-1] # L_n set to 1
+
+    def lte_loss(self, x, cond=None):
+
+        # Eq. 24
+        d = torch.sqrt(torch.mean(
+            (x[1:] - self.step(x[:-1], cond))**2, dim=list(range(2, x.ndim))
+        )) 
+        
+        return d.sum(0) # L_n set to 1
 
     def forward(self, cond=None, batch_size=None):
         """
@@ -140,7 +154,7 @@ class BespokeSolver(nn.Module):
             vel =  f(self.t_sol, x_true)
         x_aux = x_true + vel*(self.t_sol - t_stop).view(*self.cast_shape)
         
-        return self.rmse_bound(x_aux, cond)
+        return self.loss(x_aux, cond)
 
     @torch.no_grad()
     def solve(self, cond=None, x0=None):
