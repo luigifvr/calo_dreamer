@@ -10,10 +10,11 @@ import torch
 from argparse import ArgumentParser
 from challenge_files import evaluate
 from documenter import Documenter
+from torch.utils.data import DataLoader
 from torchdiffeq import odeint
 from Util.util import load_params
 
-FIXED_SOLVERS = ['euler', 'midpoint']
+FIXED_SOLVERS = ['euler', 'midpoint', 'rk4']
 ADAPTIVE_SOLVERS = ['dopri5']
 BESPOKE_SOLVERS = ['BespokeEuler', 'BespokeMidpoint']
 solver_choices = FIXED_SOLVERS + ADAPTIVE_SOLVERS + BESPOKE_SOLVERS
@@ -29,9 +30,7 @@ parser.add_argument('--tols', type=float)
 parser.add_argument('--n_samples', type=int, default=5000)
 parser.add_argument('--n_runs', type=int, default=20)
 parser.add_argument('--eval_mode', default='cls-high')
-# parser.add_argument('-q', '--queue', default='gpu-a100-short')
-# parser.add_argument('-t', '--time', default=120)
-# parser.add_argument('-m', '--memory', default='32G')
+parser.add_argument('--batch_size', type=int, default=5000)
 args = parser.parse_args()
 
 class SolveFunc:
@@ -56,30 +55,22 @@ def benchmark(args):
     precision = args.tols if args.solver in ADAPTIVE_SOLVERS else args.steps
     doc = Documenter(f'benchmark_{args.solver}_{precision}')
 
-    # load shape and energy models
-    models = {}
-    for model_type in 'energy', 'shape':
-        model_dir = getattr(args, model_type+'_model')
-        params = load_params(os.path.join(model_dir, 'params.yaml'))
-        params['eval_mode'] = args.eval_mode
-        model = Models.TBD(params, device=device,
-            doc=Documenter(None, existing_run=model_dir, read_only=True))
-        model.load()
-        # set to eval mode and freeze weights
-        model.eval()
-        for p in model.parameters():
-            p.requires_grad = False
-        models[model_type] = model
+    with torch.no_grad():
+        # load shape and energy models
+        models = {}
+        for model_type in 'energy', 'shape':
+            model_dir = getattr(args, model_type+'_model')
+            params = load_params(os.path.join(model_dir, 'params.yaml'))
+            params['eval_mode'] = args.eval_mode
+            model = Models.TBD(params, device=device,
+                doc=Documenter(None, existing_run=model_dir, read_only=True)
+            )
+            model.load()
+            # set to eval mode
+            model.eval()
+            models[model_type] = model
 
-    for _ in range(args.n_runs):
-        
-        # generate condition
-        Einc = torch.rand([args.n_samples, 1], device=device) # Assuming u_model expects Einc uniform in [0,1]
-        with torch.no_grad():
-            u_samples = models['energy'].sample_batch(Einc)
-        cond = torch.cat([Einc, u_samples], dim=1)
-
-        # dispatch to chosen solver and generate sample
+        # load bespoke solver if necessary
         if args.solver in BESPOKE_SOLVERS:
             solver = getattr(Models, args.solver)(
                 params=load_params(os.path.join(args.bespoke_dir, 'params.yaml')),
@@ -87,40 +78,69 @@ def benchmark(args):
                 device=device
             )
             solver.load()
-            sample = solver.solve(cond)
         else:
-            solve_fn = SolveFunc(models['shape'].net, cond, device)            
-            y0 = torch.randn((args.n_samples, *models['shape'].shape),
-                    device=device)            
-            times = torch.tensor([0, 1], dtype=torch.float32, device=device)
+            solve_times = torch.tensor([0, 1], dtype=torch.float32, device=device)
             solver_kwargs = (
                 {'options': {'step_size': 1/args.steps}}
                 if args.solver in FIXED_SOLVERS else
                 {'atol': args.tols, 'rtol': args.tols}
+            )             
+
+        for _ in range(args.n_runs):
+            
+            # initialize condition loader
+            Eincs = DataLoader(
+                dataset=torch.rand([args.n_samples, 1]),
+                batch_size=args.batch_size, shuffle=False
             )
-            with torch.no_grad():
-                sample = odeint(solve_fn, y0, times, method=args.solver,
-                    **solver_kwargs)[-1]
-            # model.params['solver_kwargs'] = (
-            #     {'method': args.solver, 'options': {'step_size': 1/args.steps}} 
-            #     if args.solver in FIXED_SOLVERS else
-            #     {'method': args.solver, 'atol': args.tol, 'rtol': args.tol}
-            # )
-            # sample = models['shape'].sample_batch(cond)
-        
-        # post-process
-        for fn in models['shape'].transforms[::-1]:
-            sample, cond = fn(sample, cond, rev=True)
-        sample = sample.detach().cpu().numpy()
-        cond = cond.detach().cpu().numpy()
 
-        # classify
-        evaluate.run_from_py(sample, cond, doc, models['shape'].params)
+            # loop over batches and generate sample
+            samples, conds, nfes = [], [], []
+            for Einc in Eincs:
 
-        # TODO: Put this _before_ evaluate so that NFE is prepended...
+                Einc = Einc.to(device)
+
+                # first sample layer energies
+                u_sample = models['energy'].sample_batch(Einc)
+                cond = torch.cat([Einc, u_sample], dim=1)
+                del u_sample
+
+                # dispatch to chosen solver and sample shower
+                if args.solver in BESPOKE_SOLVERS:
+                    sample = solver.solve(cond)
+                else:
+                    solve_fn = SolveFunc(models['shape'].net, cond, device)
+                    y0 = torch.randn(
+                        (args.batch_size, *models['shape'].shape), device=device
+                    )
+                    sample = odeint(
+                        solve_fn, y0, solve_times, method=args.solver,
+                        **solver_kwargs
+                    )[-1]
+                
+                # optionally keep track of nfe
+                if args.solver in ADAPTIVE_SOLVERS:
+                    nfes.append(solve_fn.nfe)
+                
+                # collect samples on cpu
+                samples.append(sample.cpu())
+                conds.append(cond.cpu())
+                
+            # post-process
+            sample = torch.vstack(samples)
+            cond = torch.vstack(conds)
+            for fn in models['shape'].transforms[::-1]:
+                sample, cond = fn(sample, cond, rev=True)
+
+            # classify
+            evaluate.run_from_py(
+                sample.numpy(), cond.numpy(), doc, models['shape'].params
+            )
+
+        # append mean NFE to the log
         if args.solver in ADAPTIVE_SOLVERS:
             with open(doc.get_file('eval/classifier_cls-high_2.txt'), 'a') as f:
-                f.write(f"NFE: {solve_fn.nfe}\n")
+                f.write(f"NFE: {sum(nfes)/len(nfes):.3f}\n")
         
 if __name__ == '__main__':
     benchmark(args)
