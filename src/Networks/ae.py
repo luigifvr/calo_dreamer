@@ -1,4 +1,4 @@
-from more_itertools import pairwise
+from itertools import pairwise
 import numpy as np
 import torch
 import torch.nn as nn
@@ -40,11 +40,6 @@ class Conv3DBlock(nn.Module):
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
         
-        #convnext
-        #self.l_conv = nn.Conv3d(
-        #        in_channels=in_channels, out_channels=in_channels, 
-        #        kernel_size=7, padding=3
-        #        )
         self.break_dims = break_dims or []
         self.conv1 = nn.Conv3d(
             in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
@@ -56,7 +51,6 @@ class Conv3DBlock(nn.Module):
             kernel_size=3, padding=1
         )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
-        #self.act = nn.ReLU()
         self.act = nn.SiLU()
 
         self.bottleneck = bottleneck
@@ -68,7 +62,6 @@ class Conv3DBlock(nn.Module):
 
     def forward(self, input, condition=None):
 
-        #res = self.l_conv(input)
         # conv1
         res = add_coord_channels(input, self.break_dims)
         res = self.conv1(res)
@@ -85,7 +78,6 @@ class Conv3DBlock(nn.Module):
         res = add_coord_channels(res, self.break_dims)
         res = self.conv2(res)
         res = self.act(self.bn2(res))
-        #res = self.bn2(self.act(res))
 
         # pooling
         out = None
@@ -120,10 +112,6 @@ class UpConv3DBlock(nn.Module):
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
-        # self.l_conv = nn.ConvTranspose3d(
-        #     in_channels=in_channels, out_channels=in_channels,
-        #     kernel_size=7, padding=3,
-        # )
  
         self.break_dims = break_dims or []
         self.upconv1 = nn.ConvTranspose3d(
@@ -131,7 +119,6 @@ class UpConv3DBlock(nn.Module):
             kernel_size=up_kernel, stride=up_stride, padding=up_crop,
             output_padding=output_padding
         )
-        #self.act = nn.ReLU()
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
@@ -146,7 +133,6 @@ class UpConv3DBlock(nn.Module):
 
     def forward(self, input, residual=None, condition=None):
 
-        #out = self.l_conv(input)
         # upsample
         out = add_coord_channels(input, self.break_dims)
         out = self.upconv1(out)
@@ -164,13 +150,11 @@ class UpConv3DBlock(nn.Module):
             out = out + self.cond_layer(condition).view(
                 -1, self.out_channels, 1, 1, 1
             )
-        #out = self.bn1(self.act(out))
         out = self.act(self.bn1(out))
 
         # conv2
         out = add_coord_channels(out, self.break_dims)
         out = self.conv2(out)
-        #out = self.bn2(self.act(out))
         out = self.act(self.bn2(out))
 
         return out
@@ -227,6 +211,8 @@ class AutoEncoder(nn.Module):
         ])
 
         # Bottleneck block
+        
+        
         if self.ae_kl:
             self.conv_mu = nn.Conv3d(
                     in_channels=bottle_channel, out_channels=bottle_channel,
@@ -243,7 +229,6 @@ class AutoEncoder(nn.Module):
                     out_channels=bottle_channel, kernel_size=(1,1,1)
                 ),
             ])
-
         else:
             self.bottleneck = nn.ModuleList([
                 nn.Conv3d(
@@ -266,7 +251,6 @@ class AutoEncoder(nn.Module):
             in_channels=level_channels[0]+len(self.ae_break_dims),
             out_channels=1, kernel_size=(1, 1, 1)
         )
-        self.out_act = torch.nn.Softmax(-1)
 
     def forward(self, x, c=None):
 
@@ -290,8 +274,6 @@ class AutoEncoder(nn.Module):
         if self.ae_kl:
             mu = self.conv_mu(out)
             logvar = self.conv_logvar(out)
-            #mu = out[:, :int(out.shape[1]/2)]
-            #logvar = out[:, int(out.shape[1]/2):]
             return mu, logvar
         return out
 
@@ -302,12 +284,10 @@ class AutoEncoder(nn.Module):
             out = up(out, residual=None, condition=c)
         out = add_coord_channels(out, self.ae_break_dims)
         out = self.output_layer(out)
-        
         return torch.sigmoid(out)
 
     def reparameterize(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
-        # return torch.normal(mu, std)
         esp = torch.randn(*mu.size()).to(mu.device)
         z = mu + std * esp
         return z
