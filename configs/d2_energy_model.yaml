@@ -29,13 +29,13 @@ transforms: {
 lr: 1.e-4
 max_lr: 2.e-3
 batch_size: 4000
-validate_every: 1
+validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 10000
-cycle_epochs: 10000
+n_epochs: 20000
+cycle_epochs: 20000
 cycle_pct_start: 0.1
 save_interval: 100_001
 

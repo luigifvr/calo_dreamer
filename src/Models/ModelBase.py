@@ -297,8 +297,7 @@ class GenerativeModel(nn.Module):
 
         # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
         Einc = torch.tensor(
-            # Ayo: TODO: Handle single energy option for datasets 2 & 3
-            10**np.random.uniform(3, 6, size=10**5) 
+            10**np.random.uniform(3, 6, size=get(self.params, "n_samples", 10**5)) 
             if self.params['eval_dataset'] in ['2', '3'] else
             self.generate_Einc_ds1(energy=self.single_energy),
             dtype=torch.get_default_dtype(),
@@ -324,7 +323,7 @@ class GenerativeModel(nn.Module):
             # sample us
             u_samples = torch.vstack([
                 energy_model.sample_batch(c) for c in transformed_cond_loader
-            ]).to(self.device)
+            ])
 
             # # post-process u-samples according to energy config
             # dummy = torch.empty(1, 1)
@@ -345,9 +344,9 @@ class GenerativeModel(nn.Module):
                 dataset=transformed_cond, batch_size=batch_size_sample, shuffle=False
             )
                 
-        sample = torch.vstack([self.sample_batch(c) for c in transformed_cond_loader])
+        sample = torch.vstack([self.sample_batch(c).cpu() for c in transformed_cond_loader])
 
-        return sample, transformed_cond.detach().cpu()
+        return sample, transformed_cond.cpu()
     
     def reconstruct_n(self,):
         recos = []
@@ -356,8 +355,12 @@ class GenerativeModel(nn.Module):
         self.net.eval()
         for n, x in enumerate(self.train_loader):
             reco, cond = self.sample_batch(x)
-            recos.append(reco)
-            energies.append(cond)
+            recos.append(reco.detach().cpu())
+            energies.append(cond.detach().cpu())
+        for n, x in enumerate(self.val_loader):
+            reco, cond = self.sample_batch(x)
+            recos.append(reco.detach().cpu())
+            energies.append(cond.detach().cpu())
 
         recos = torch.vstack(recos)
         energies = torch.vstack(energies)
@@ -420,9 +423,10 @@ class GenerativeModel(nn.Module):
 
     def plot_saved_samples(self, name="", energy=None, doc=None):
         if doc is None: doc = self.doc
+        mode = self.params.get('eval_mode', 'all')
         script_args = (
             f"-i {doc.basedir}/samples{name}.hdf5 "
-            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
             f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())

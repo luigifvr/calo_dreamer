@@ -79,8 +79,7 @@ class TransfusionAR(GenerativeModel):
         return loss
 
     def sample_batch(self,c):
-        pred = self.net(c, rev=True)
-        return pred.detach().cpu().numpy()
+        return self.net(c, rev=True)
 
 def linear_trajectory(x_0, x_1, t):
     x_t = (1 - t) * x_0 + t * x_1
