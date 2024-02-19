@@ -36,16 +36,16 @@ autoencoder: /home/aore/calo_dreamer/results/20240205_041200_d3_ae # factor 1.75
 
 # Training
 lr: 1.e-3
-max_lr: 5.e-4
-div_factor: 100
+max_lr: 1.e-3
+div_factor: 200
 batch_size: 250
 validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 100
-cycle_epochs: 100
+n_epochs: 1000
+cycle_epochs: 1000
 cycle_pct_start: 0.1
 save_interval: 100_001
 
