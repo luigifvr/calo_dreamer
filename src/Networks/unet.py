@@ -86,8 +86,7 @@ class Conv3DBlock(nn.Module):
 
         # conv2
         res = add_coord_channels(res, self.break_dims)
-        res = self.conv2(res)
-        res = self.act(self.bn2(res))
+        res = self.act(self.bn2(self.conv2(res)))
 
         # pooling
         out = None
@@ -163,8 +162,7 @@ class UpConv3DBlock(nn.Module):
 
         # conv2
         out = add_coord_channels(out, self.break_dims)
-        out = self.conv2(out)
-        out = self.act(self.bn2(out))
+        out = self.act(self.bn2(self.conv2(out)))
 
         return out
 
@@ -338,22 +336,21 @@ class CylindricalConv3DBlock(nn.Module):
             in_channels=out_channels+len(self.break_dims), bias=False,
             out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
-
         self.circ_pad = lambda x, p: F.pad(x, (0, 0, 0, p, 0, 0), mode='circular')
         
         self.bottleneck = bottleneck
         if not bottleneck:
             self.down_pad_size = (
-                (down_kernel if down_kernel is int else down_kernel[-2])
-              - (down_stride if down_stride is int else down_stride[-2])
+                (down_kernel if type(down_kernel) is int else down_kernel[-2])
+              - (down_stride if type(down_stride) is int else down_stride[-2])
             )
             self.pooling = nn.MaxPool3d(kernel_size=down_kernel, stride=down_stride)
             
     def forward(self, input, condition=None):
 
         # conv1
-        res = self.circ_pad(input, 2)
-        res = add_coord_channels(res, self.break_dims)
+        res = add_coord_channels(input, self.break_dims)
+        res = self.circ_pad(res, 2)
         res = self.conv1(res)
 
         # conditioning
@@ -364,14 +361,14 @@ class CylindricalConv3DBlock(nn.Module):
         res = self.act(self.bn1(res))
 
         # conv2
-        res = self.circ_pad(res, 2)
         res = add_coord_channels(res, self.break_dims)
-        res = self.conv2(res)
-        res = self.act(self.bn2(res))
+        res = self.circ_pad(res, 2)
+        res = self.act(self.bn2(self.conv2(res)))
 
         out = None
         if not self.bottleneck:
-            out = self.pooling(self.circ_pad(res, self.down_pad_size))
+            out = self.circ_pad(res, self.down_pad_size)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
@@ -422,8 +419,8 @@ class CylindricalUpConv3DBlock(nn.Module):
             kernel_size=up_kernel, stride=up_stride, output_padding=output_padding
         )
         self.up_crop_size = (
-            (up_kernel if up_kernel is int else up_kernel[-2])
-          - (up_stride if up_stride is int else up_stride[-2])
+            (up_kernel if type(up_kernel) is int else up_kernel[-2])
+          - (up_stride if type(up_stride) is int else up_stride[-2])
         )        
         self.circ_pad = lambda x, p: F.pad(x, (0, 0, 0, p, 0, 0), mode='circular')
         self.use_circ_crop = use_circ_crop
@@ -431,10 +428,10 @@ class CylindricalUpConv3DBlock(nn.Module):
     def circ_crop(self, x):
         """
         Cropping operation that averages over cirular padding
-                          X0 | X1 | ... | X7 | X8 | R0 | R1
+                          X0 | X1 | ... | X7 | X8 | x0 | x1
                                      |
                                      V
-            (X0+R0)/2 | (X1+R1)/2 | ... | X7 | X8
+            (X0+x0)/2 | (X1+x1)/2 | ... | X7 | X8
         """
         C = self.up_crop_size
 
@@ -462,8 +459,8 @@ class CylindricalUpConv3DBlock(nn.Module):
             out = out + residual
 
         # conv1
-        out = self.circ_pad(out, 2)
         out = add_coord_channels(out, self.break_dims)
+        out = self.circ_pad(out, 2)
         out = self.conv1(out)
 
         # conditioning
@@ -474,10 +471,9 @@ class CylindricalUpConv3DBlock(nn.Module):
         out = self.act(self.bn1(out))
 
         # conv2
-        out = self.circ_pad(out, 2)
         out = add_coord_channels(out, self.break_dims)
-        out = self.conv2(out)
-        out = self.act(self.bn2(out))
+        out = self.circ_pad(out, 2)
+        out = self.act(self.bn2(self.conv2(out)))
 
         return out
 

@@ -401,7 +401,7 @@ def extract_shower_and_energy(given_file, which, single_energy=None, max_len=-1)
         shower = given_file['showers'][:max_len]
         energy = given_file['incident_energies'][:max_len]
     print("Extracting showers from {} file: DONE.\n".format(which))
-    return shower, energy
+    return shower.astype('float32', copy=False), energy.astype('float32', copy=False)
 
 def load_reference(filename):
     """ Load existing pickle with high-level features for reference in plots """

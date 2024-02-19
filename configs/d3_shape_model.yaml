@@ -1,4 +1,4 @@
-run_name: d3_2000_epoch_shape_model
+run_name: d3_1200_epoch_shape_model
 dtype: float32
 
 # Model
@@ -44,10 +44,10 @@ batch_size: 500
 validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.001
+# weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 2000
-cycle_epochs: 2000
+n_epochs: 1200
+cycle_epochs: 1200
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -55,7 +55,7 @@ save_interval: 100_001
 sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
-solver_kwargs: {method: midpoint, options: {step_size: 0.025}}
+solver_kwargs: {method: rk4, options: {step_size: 0.02}}
 
 # Network
 network: UNet
