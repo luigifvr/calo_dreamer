@@ -527,19 +527,22 @@ class GenerativeModel(nn.Module):
         #self.optim.load_state_dict(state_dicts["opt"])
         self.net.to(self.device)
 
-    def load_other(self, model_dir, model_class='TBD'):
+    def load_other(self, model_dir, model_class='TBD'): #TODO:remove model_class
         """ Load a different model (e.g. to sample u_i's)"""
+        
+        with open(os.path.join(model_dir, 'params.yaml')) as f:
+            params = yaml.load(f, Loader=yaml.FullLoader)
 
+        model_class = params['model']
         # choose model
         if model_class == 'TBD':
             Model = self.__class__
+        if model_class == 'TransfusionAR':
+            from Models import TransfusionAR
+            Model = TransfusionAR
         elif model_class == 'AE':
             from Models import AE
             Model = AE
-
-        # get params
-        with open(os.path.join(model_dir, 'params.yaml')) as f:
-            params = yaml.load(f, Loader=yaml.FullLoader)
 
         # load model
         doc = Documenter(None, existing_run=model_dir, read_only=True)

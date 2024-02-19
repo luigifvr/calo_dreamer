@@ -1,4 +1,4 @@
-run_name: d2_test_ae_wallconvs_3ch_4k_mse_nostd_long
+run_name: d2_test_ae_wallconvs_3ch_4k_bce_wcoords_lrelu_nor
 dtype: float32
 
 # Model
@@ -9,7 +9,7 @@ energy_model: /remote/gpu06/favaro/CaloDream/calo_dreamer/results/20240103_19195
 hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
 eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5 # for the ae this is the training file
 xml_filename: /remote/gpu06/favaro/datasets/calo_challenge/binning_dataset_2.xml
-val_frac: 0.05
+val_frac: 0.01
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
@@ -21,6 +21,8 @@ transforms: {
       ptype: /remote/gpu06/favaro/datasets/calo_challenge/binning_dataset_2.xml,
       xml_file: electron
     },
+    ZeroMask: {cut: 1.e-4},
+    #Reweight: {factor: 0.9},
     #SelectiveUniformNoise: {
     #    noise_width: 1.0e-6,
     #    cut: True,
@@ -47,8 +49,8 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 100
-cycle_epochs: 100
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.2
 save_interval: 100_001
 
@@ -81,3 +83,4 @@ ae_level_strides: [[3,2,1]]
 ae_level_pads: [[0,0,0]]
 ae_encode_c: True
 ae_encode_c_dim: 100
+ae_break_dims: [2,4]

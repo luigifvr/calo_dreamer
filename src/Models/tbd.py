@@ -65,6 +65,8 @@ class TBD(GenerativeModel):
         if self.latent:
             # encode x into autoencoder latent space
             x = self.ae.encode(x, condition)
+            if self.ae.kl:
+                x = self.ae.reparameterize(x[0], x[1])
 
         # t = self.distribution.sample((x.size(0),1)).to(x.device)
         t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)

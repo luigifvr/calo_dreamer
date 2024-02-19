@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 import Networks
 import Models
@@ -17,6 +18,10 @@ class AE(GenerativeModel):
 
     def __init__(self, params, device, doc):
         super().__init__(params, device, doc)
+        self.lat_mean = None
+        self.lat_std = None
+        self.shape = self.params.get('ae_latent_shape')
+        self.kl = self.params.get('ae_kl')
         # parameters for autoencoder
 
     def build_net(self):
@@ -40,11 +45,26 @@ class AE(GenerativeModel):
         # return x, condition, weights
         return input[0], condition, weights
 
+    def forward(self, x):
+        # Get reconstructions
+        x, condition, weights = self.get_conditions_and_input(x)
+        c = self.net.c_encoding(condition)
+        z = self.net.encode(x, c)
+        if self.params.get('ae_kl', False):
+            mu, logvar = z[0], z[1]
+            z = self.net.reparameterize(mu, logvar)
+            #z = z.reshape(-1,*self.shape)
+            rec = self.net.decode(z, c)
+            return rec, mu, logvar
+        return self.net.decode(z, c)
+
     def batch_loss(self, x):
         #calculate loss for 1 batch
+        if self.params.get('ae_kl', False):
+            rec, mu, logvar = self.forward(x)
+        else:
+            rec = self.forward(x)
         x, condition, weights = self.get_conditions_and_input(x)
-
-        rec = self.net(x, condition)
         loss_fn = self.params.get('ae_loss', 'mse')
         if loss_fn == 'mse':
             loss = torch.mean((x - rec) ** 2)
@@ -52,6 +72,9 @@ class AE(GenerativeModel):
             loss_fn = torch.nn.BCELoss()
             loss = loss_fn(rec, x)
         elif loss_fn == 'mod-bce':
+            rec = rec.reshape(-1, 45, 16*9)
+            rec = F.log_softmax(rec, dim=-1)
+            rec = rec.reshape(-1, 45, 16, 9)
             loss = -torch.mean(x*rec)
         elif loss_fn == 'bce_mse':
             loss_fn = torch.nn.BCELoss()
@@ -60,17 +83,36 @@ class AE(GenerativeModel):
             loss = loss_bce+ 0.0001*loss_mse
         elif loss_fn == 'cbce':
             loss = loss_cbvae(rec, x)
+        elif loss_fn == 'bce_reg':
+            alpha = self.params.get('bce_reg_alpha', 1.0)
+            loss_fn = torch.nn.BCELoss()
+            
+            loss_reg = torch.mean(enc**2/2)
+            loss = loss_fn(rec, x)
+            loss += alpha*loss_reg
+        elif loss_fn == 'bce_kl':
+            loss_fn = torch.nn.BCELoss()
+            beta = self.params.get('ae_kl_beta', 1.e-5)
+            KLD = -0.5 * torch.mean(1 + logvar - mu**2 -  logvar.exp())
+            loss = loss_fn(rec, x) + beta*KLD
+        elif loss_fn == 'focal':
+            gamma = self.params.get('gamma', 0.5)
+            loss_fn = FocalLoss(gamma=gamma)
+            loss = loss_fn(rec, x)
         else:
             raise Exception("Unknown loss function")
 
         return loss
-    
+
     def sample_batch(self, x):
         with torch.no_grad():
-            x, condition, weights = self.get_conditions_and_input(x)
-            rec = self.net(x, condition)
+            x_inp, condition, weights = self.get_conditions_and_input(x)
+            if self.params.get('ae_kl', False):
+                rec, mu, logvar = self.forward(x)
+            else:
+                rec = self.net(x_inp, condition)
         return rec.detach().cpu(), condition.detach().cpu()
- 
+
     def plot_samples(self, samples, conditions, name="", energy=None, mode='all'): #TODO
         transforms = self.transforms
         print("Plotting reconstructions of input showers")
@@ -87,9 +129,55 @@ class AE(GenerativeModel):
     @torch.no_grad()
     def encode(self, x, c):
         c = self.net.c_encoding(c)
-        return self.net.encode(x, c)
+        enc = self.net.encode(x,c)
+        return enc
 
     @torch.no_grad()
     def decode(self, x, c):
         c = self.net.c_encoding(c)
-        return self.net.decode(x, c)        
+        return self.net.decode(x, c)
+
+    @torch.no_grad()
+    def reparameterize(self, mu, logvar):
+        std = logvar.mul(0.5).exp_()
+        esp = torch.randn(*mu.size()).to(mu.device)
+        z = mu + std*esp
+        return z
+
+#temp
+import torch.nn.functional as F
+from torch.autograd import Variable
+
+class FocalLoss(torch.nn.Module):
+    def __init__(self, gamma=0, alpha=None, size_average=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        if isinstance(alpha,(float,int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha,list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim()>2:
+            input = input.view(input.size(0),input.size(2),-1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1,2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1,input.size(2))   # N,H*W,C => N*H*W,C
+        target = target.flatten()
+
+        logpt = F.log_softmax(input, dim=-1).flatten()
+        #logpt = logpt.gather(1,target)
+        logpt = logpt*target
+        logpt = logpt.view(-1)
+        pt = Variable(logpt.data.exp())
+
+        if self.alpha is not None:
+            if self.alpha.type()!=input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0,target.data.view(-1))
+            logpt = logpt * Variable(at)
+
+        loss = -1 * (1-pt)**self.gamma * logpt
+        if self.size_average: return loss.mean()
+        else: return loss.sum()
+
+
