@@ -6,6 +6,7 @@ from Util.util import get
 from Models.ModelBase import GenerativeModel
 import Networks
 import Models
+from einops import rearrange
 
 import math
 from typing import Type, Callable, Union, Optional
@@ -63,14 +64,20 @@ class TransfusionAR(GenerativeModel):
             loss_terms: dictionary with loss contributions
         """
         x, c, _ = self.get_condition_and_input(input)
-
-        # Sample noise variables
-        x_0 = torch.randn_like(x)
-        # Sample time steps
-        #t = torch.rand((x.size(0), x.size(1)), dtype=x.dtype, device=x.device)
-        t = self.distribution.sample([x.shape[0]] + [1] * (x.dim() - 1)).to(x.device)
+        c = c.unsqueeze(-1)
+        #t = self.distribution.sample(x.size(0),x.size(1) ,1).to(x.device)
         # Calculate point and derivative on trajectory
+        if self.params['model_type'] == 'energy':
+            x = x.unsqueeze(-1)
+        else:
+        #     x = rearrange(x, " b c l x y -> b (c l) (x y)")
+            x = rearrange(x, " b c l x y -> b l c x y")
+        # Sample time steps
+        t = torch.rand((x.size(0), x.size(1), 1, 1, 1), dtype=x.dtype, device=x.device)
+        # Sample noise variables
+        x_0 = torch.randn((x.size(0), x.size(1), 1, x.size(3),x.size(4)), dtype=x.dtype, device=x.device)
         x_t, x_t_dot = self.trajectory(x_0, x, t)
+
 
         v_pred = self.net(c,x_t,t,x)
         # Mask out masses if not needed
@@ -79,6 +86,7 @@ class TransfusionAR(GenerativeModel):
         return loss
 
     def sample_batch(self,c):
+        c = c.unsqueeze(-1)
         pred = self.net(c, rev=True)
         return pred.detach().cpu().numpy()
 
