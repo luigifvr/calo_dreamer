@@ -12,9 +12,6 @@ from challenge_files import *
 from challenge_files import evaluate
 
 class AE(GenerativeModel):
-    """
-    Class for the AutoEncoder
-    """
 
     def __init__(self, params, device, doc):
         super().__init__(params, device, doc)
@@ -45,10 +42,9 @@ class AE(GenerativeModel):
         # return x, condition, weights
         return input[0], condition, weights
 
-    def forward(self, x):
-        # Get reconstructions
-        x, condition, weights = self.get_conditions_and_input(x)
-        c = self.net.c_encoding(condition)
+    def forward(self, x, c):
+        
+        c = self.net.c_encoding(c)
         z = self.net.encode(x, c)
         if self.params.get('ae_kl', False):
             mu, logvar = z[0], z[1]
@@ -59,12 +55,17 @@ class AE(GenerativeModel):
         return self.net.decode(z, c)
 
     def batch_loss(self, x):
+        
+        x, c, _ = self.get_conditions_and_input(x)
+        c = c.repeat_interleave(x.shape[1], 0) # repeat condition for each layer
+        x = x.flatten(0,1).unsqueeze(1) # flatten B,L and add channel
+
         #calculate loss for 1 batch
         if self.params.get('ae_kl', False):
             rec, mu, logvar = self.forward(x)
         else:
-            rec = self.forward(x)
-        x, condition, weights = self.get_conditions_and_input(x)
+            rec = self.forward(x, c)
+        
         loss_fn = self.params.get('ae_loss', 'mse')
         if loss_fn == 'mse':
             loss = torch.mean((x - rec) ** 2)

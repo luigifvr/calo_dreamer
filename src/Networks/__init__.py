@@ -1,4 +1,4 @@
-from .ae import AutoEncoder, CylindricalAutoEncoder
+from .ae import AutoEncoder
 from .cfm_transformer import CFMTransformer
 from .resnet import Resnet, Conditional_Resnet
 from .transformer import ARtransformer

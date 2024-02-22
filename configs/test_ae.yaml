@@ -1,4 +1,4 @@
-run_name: d2_test_ae_wallconvs_3ch_4k_bce_wcoords_lrelu_nor
+run_name: d2_test_ae
 dtype: float32
 
 # Model
@@ -7,8 +7,8 @@ energy_model: /remote/gpu06/favaro/CaloDream/calo_dreamer/results/20240103_19195
 
 # Data
 hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
-eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5 # for the ae this is the training file
-xml_filename: /remote/gpu06/favaro/datasets/calo_challenge/binning_dataset_2.xml
+eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.01
 eps: 1.0e-10
 particle_type: electron
@@ -18,7 +18,7 @@ shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-      ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+      ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
       xml_file: electron
     },
     ZeroMask: {cut: 1.e-4},
@@ -43,10 +43,10 @@ transforms: {
 # Training
 lr: 1.e-3
 max_lr: 1.e-3
-batch_size: 128
+batch_size: 500
 validate_every: 10
 use_scheduler: True
-lr_scheduler: one_cycle_lr
+lr_scheduler: CosineAnnealing
 weight_decay: 0.0001
 betas: [0.9, 0.999]
 n_epochs: 500
