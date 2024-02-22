@@ -51,10 +51,8 @@ class TBD(GenerativeModel):
         :param input: model input + conditional input
         :return: model input, conditional input
         """
-        # x = input[0].clone()
         condition = input[1]
         weights = None
-        # return x, condition, weights
         return input[0], condition, weights
 
     def batch_loss(self, x):
@@ -64,6 +62,12 @@ class TBD(GenerativeModel):
         # get input and conditions
         x, condition, weights = self.get_condition_and_input(x)
         
+        if self.latent:
+            # encode x into autoencoder latent space
+            x = self.ae.encode(x, condition)
+            if self.ae.kl:
+                x = self.ae.reparameterize(x[0], x[1])
+
         # t = self.distribution.sample((x.size(0),1)).to(x.device)
         t = self.distribution.sample([x.shape[0]] + [1]*(x.dim() - 1)).to(x.device)
         x_0 = torch.randn_like(x)
@@ -87,33 +91,30 @@ class TBD(GenerativeModel):
         Generate n_samples new samples.
         Start from Gaussian random noise and solve the reverse ODE to obtain samples
         """
-        # batch = batch[:, None] # moved to before sample_batch call
         dtype = batch.dtype
         device = batch.device
 
         x_T = torch.randn((batch.shape[0], *self.shape), dtype=dtype, device=device)
 
         def f(t, x_t):
-            # t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype)
-            # print(x_t.shape)
-            # print(t_torch.shape)
-            # print(batch.shape)
             t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
-            v = self.net(x_t, t_torch, batch)
-
-            return v
+            return self.net(x_t, t_torch, batch)
 
         with torch.no_grad():
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
-            
-            x_t = solver(
+
+            sample = solver(
                 function, x_T,
                 torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
                 **self.params.get("solver_kwargs", {})
-            )
+            )[-1]
+
+            if self.latent:
+                # decode the generated sample
+                sample = self.ae.decode(sample, batch)
             
-        return x_t[-1]
+        return sample
 
     def invert_n(self, samples):
         """

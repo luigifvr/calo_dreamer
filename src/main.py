@@ -4,10 +4,8 @@ import shutil
 import yaml
 import torch
 import Models
-import numpy as np
 
 from documenter import Documenter
-from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -56,7 +54,10 @@ def main():
     else:
         if args.generate:
             model.load(args.epoch)
-            x, c = model.sample_n()
+            if params.get("reconstruct", False):
+                x, c = model.reconstruct_n()
+            else:
+                x, c = model.sample_n()
             model.plot_samples(x, c, name=f"{args.epoch}")
         else:
             model.plot_saved_samples(name=f"{args.epoch}")

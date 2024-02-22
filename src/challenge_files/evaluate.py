@@ -584,12 +584,12 @@ def run_from_py(sample, energy, doc, params):
         print("Plotting average shower: DONE.\n")
 
         print("Plotting randomly selected reference and generated shower: ")
-        hlf.DrawSingleShower(sample[:10], 
+        hlf.DrawSingleShower(sample[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
                              title="Single shower")
-        hlf.DrawSingleShower(reference_shower[:10], 
+        hlf.DrawSingleShower(reference_shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'reference_single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
@@ -830,12 +830,12 @@ def main(raw_args=None):
         print("Plotting average shower: DONE.\n")
 
         print("Plotting randomly selected reference and generated shower: ")
-        hlf.DrawSingleShower(shower[:10], 
+        hlf.DrawSingleShower(shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
                              title="Single shower")
-        hlf.DrawSingleShower(reference_shower[:10], 
+        hlf.DrawSingleShower(reference_shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'reference_single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
