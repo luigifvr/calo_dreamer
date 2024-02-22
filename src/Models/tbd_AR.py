@@ -65,20 +65,14 @@ class TransfusionAR(GenerativeModel):
         """
         x, c, _ = self.get_condition_and_input(input)
         c = c.unsqueeze(-1)
-        #t = self.distribution.sample(x.size(0),x.size(1) ,1).to(x.device)
-        # Calculate point and derivative on trajectory
-        if self.params['model_type'] == 'energy':
-            x = x.unsqueeze(-1)
-        else:
-        #     x = rearrange(x, " b c l x y -> b (c l) (x y)")
-            x = rearrange(x, " b c l x y -> b l c x y")
         # Sample time steps
-        t = torch.rand((x.size(0), x.size(1), 1, 1, 1), dtype=x.dtype, device=x.device)
+        t = torch.rand(
+            list(x.shape[:2]) + [1]*(x.ndim-2), dtype=x.dtype, device=x.device
+        )
         # Sample noise variables
-        x_0 = torch.randn((x.size(0), x.size(1), 1, x.size(3),x.size(4)), dtype=x.dtype, device=x.device)
+        x_0 = torch.randn(x.shape, dtype=x.dtype, device=x.device)
+        # Calculate point and derivative on trajectory
         x_t, x_t_dot = self.trajectory(x_0, x, t)
-
-
         v_pred = self.net(c,x_t,t,x)
         # Mask out masses if not needed
         loss = ((v_pred - x_t_dot) ** 2).mean()

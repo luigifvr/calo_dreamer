@@ -74,31 +74,6 @@ class CaloChallengeDataset(Dataset):
         print("Device: ", self.energy.device)
        
 
-        self.energy = torch.tensor(self.energy, dtype=self.dtype)
-        self.layers = torch.tensor(self.layers, dtype=self.dtype)
-
-        # apply preprocessing and then move to GPU
-        if self.transform:
-            for fn in self.transform:
-                self.layers, self.energy = fn(self.layers, self.energy)
-
-        val_size = int(len(self.energy)*val_frac)
-        trn_size = len(self.energy) - val_size
-        # make train/val split
-        if split == 'training':
-            self.layers = self.layers[:trn_size]
-            self.energy = self.energy[:trn_size]
-        elif split == 'validation':
-            self.layers = self.layers[-val_size:]
-            self.energy = self.energy[-val_size:]
-
-        self.layers = self.layers.to(device)
-        self.energy = self.energy.to(device)
-
-        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
-        print("Device: ", self.energy.device)
-
-
     def __len__(self):
         return len(self.energy)
 

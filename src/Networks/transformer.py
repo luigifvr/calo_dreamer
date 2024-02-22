@@ -125,7 +125,7 @@ class ARtransformer(nn.Module):
 
         return x_1.unsqueeze(1)
 
-    def forward(self, c,x_t=None, t=None, x=None, rev=False):
+    def forward(self, c, x_t=None, t=None, x=None, rev=False):
         if not rev:
             xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
