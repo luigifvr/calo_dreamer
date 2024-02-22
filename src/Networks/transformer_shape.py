@@ -18,7 +18,7 @@ class ARtransformer_shape(nn.Module):
         self.dim_embedding = self.params["dim_embedding"]
         self.dims_in = self.params["shape"][2] * self.params["shape"][3]
         self.dims_c = self.params["n_con"]
-        self.n_energy_layers = self.params["shape"][1]
+        self.n_energy_layers = self.params["shape"][0]
         self.bayesian = False
 
         self.c_embed = self.params.get("c_embed", None)
@@ -180,7 +180,7 @@ class ARtransformer_shape(nn.Module):
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]
-            pred = rearrange(pred, "b l c x y -> b c l x y")
+            # pred = rearrange(pred, "b l c x y -> b c l x y")
            # pred = rearrange(pred, "b (c l) (x y) -> b c l x y", c= 1)
 
 
