@@ -14,15 +14,15 @@ def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
     print("Dict of preprocessing is: ")
     print(transforms)
 
-    train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
+    train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
                     val_frac=val_frac, transform=transforms, split='training', device=device,
                     single_energy=single_energy)
-
-
+    
+    
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
                     val_frac=val_frac, transform=transforms, split='validation', device=device,
                     single_energy=single_energy)
-
+    
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -48,6 +48,31 @@ class CaloChallengeDataset(Dataset):
         self.transform = transform
         self.device = device
         self.dtype = torch.get_default_dtype()
+        
+        self.energy = torch.tensor(self.energy, dtype=self.dtype)
+        self.layers = torch.tensor(self.layers, dtype=self.dtype)
+
+        # apply preprocessing and then move to GPU
+        if self.transform:
+            for fn in self.transform:
+                self.layers, self.energy = fn(self.layers, self.energy)
+
+        val_size = int(len(self.energy)*val_frac)
+        trn_size = len(self.energy) - val_size
+        # make train/val split
+        if split == 'training':
+            self.layers = self.layers[:trn_size]
+            self.energy = self.energy[:trn_size]
+        elif split == 'validation':
+            self.layers = self.layers[-val_size:]
+            self.energy = self.energy[-val_size:]
+       
+        self.layers = self.layers.to(device)
+        self.energy = self.energy.to(device)
+
+        print("Dataset loaded, shape: ", self.layers.shape, self.energy.shape)
+        print("Device: ", self.energy.device)
+       
 
         self.energy = torch.tensor(self.energy, dtype=self.dtype)
         self.layers = torch.tensor(self.layers, dtype=self.dtype)

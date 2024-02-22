@@ -428,7 +428,7 @@ def plot_sparsity(hlf_class, reference_class, arg):
             plt.savefig(filename, format='pdf')
         if arg.mode in ['all', 'hist-chi', 'hist']:
             seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of Width Phi layer {} histogram: {}".format(key, seps))
+            print("Separation power of Sparsity layer {} histogram: {}".format(key, seps))
             with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
                 f.write('Sparsity {}: \n'.format(key))
                 f.write(str(seps))

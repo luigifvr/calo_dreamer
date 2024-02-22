@@ -88,7 +88,12 @@ class Resnet(nn.Module):
         # if true, embed condition to higher dimension
         if self.encode_condition:
             self.encode_c_dim = self.param.get("encode_c_dim", 64)
-            self.encode_c = nn.Linear(self.n_con, self.encode_c_dim)
+            # self.encode_c = nn.Linear(self.n_con, self.encode_c_dim)
+            self.encode_c = nn.Sequential(
+                nn.Linear(self.n_con, self.encode_c_dim),
+                nn.ReLU(),
+                nn.Linear(self.encode_c_dim, self.encode_c_dim)
+            )
         else:
             self.encode_c_dim = self.n_con
 

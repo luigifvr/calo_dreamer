@@ -1,60 +1,63 @@
-run_name: resnet_10_epochs
-p_type: photon
+run_name: d2_2000_epoch_shape_model_light
 dtype: float32
+
+# Model
+model_type: energy
+
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/1/dataset_1_photons_1.hdf5
-xml_filename: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml
-width_noise: 5.0e-6
+hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge//dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
-particle_type: "photon"
-eval_dataset: "1-photons"
+particle_type: electron
+eval_dataset: "2"
+
 transforms: {
- NormalizeByElayer: {ptype: /data/projects/punim0011/aore/calo_dreamer/src/challenge_files/binning_dataset_1_photons.xml, xml_file: photon},
- AddNoise: {noise_width: 5.0e-6}
+    NormalizeByElayer: {
+        ptype: /remote/gpu02/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+        xml_file: electron
+    },
+    SelectiveUniformNoise: {
+        noise_width: 5.0e-6,
+        cut: True,
+        exclusions: [-45, -44, -43, -42, -41, -40, -39, -38, -37,
+                     -36, -35, -34, -33, -32, -31, -30, -29, -28,
+                     -27, -26, -25, -24, -23, -22, -21, -20, -19,
+                     -18, -17, -16, -15, -14, -13, -12, -11, -10,
+                      -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1]
+    },
+    ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
+    StandardizeFromFile: {},
+    LogEnergy: {},
+    ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
 }
 
 # Training
-lr: 1.e-5
-max_lr: 1.e-4
-batch_size: 256
-validate_every: 100
+lr: 1.e-3
+max_lr: 1.e-3
+batch_size: 2000
+validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.01
+weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 10
-cycle_epochs: 10
-save_interval: 100
+n_epochs: 2000
+cycle_epochs: 2000
+cycle_pct_start: 0.1
+save_interval: 100_001
 
 # Sampling
 sample_periodically: False
-sample_every: 100
-sample_every_n_samples: 100
+sample_every: 10
+sample_every_n_samples: 1001
+solver_kwargs: {method: rk4, options: {step_size: 0.05}}
 
-network: Resnet
-# network: SimpleUNet
-# dim: 368
-dim: 373
-
-# ResNet block
-intermediate_dim: 256
-n_blocks: 1
-n_con: 1
-layers_per_block: 3
-conditional: True
-
-# U-Net
-hidden_dims: [256, 128, 64]
-condition_dim: 1
+# Network
+network: UNet
+condition_dim: 46
+level_channels: [32, 32, 32]
 encode_t: True
-encode_t_dim: 16
+encode_t_dim: 100
 encode_c: True
-encode_c_dim: 16
-
-# Preprocessing
-use_extra_dims: True
-use_norm: False
-log_cond: True
-alpha: 1.0e-8
-alpha_logit: 1.0e-6
+encode_c_dim: 100

@@ -1,236 +1,169 @@
+from more_itertools import pairwise
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from Networks.vblinear import VBLinear
 
-class SimpleUNet(nn.Module):
-    """A simple non-convolutional U-Net model."""
+class GaussianFourierProjection(nn.Module): # TODO: Move this (and defn in resnet.py) to separate file
+    """Gaussian random features for encoding time steps."""
 
-    def __init__(self, param):
-        """
-        :param param: A dictionary containing the relevant network parameters:
-                      
-                      dim -- The data dimension.
-                      condition_dim -- Dimension of conditional input
-                      hidden_dims -- Decreasing list of internal dimensions
-                      activation -- Activation function for hidden layers
-                      output_activation -- Activation function for output layer
-                      bayesian -- Whether or not to use bayesian layers
-                      encode_t -- Whether or not to embed the time input
-                      encode_t_dim -- Dimension of the time embedding
-                      encode_t -- Whether or not to embed the conditional input
-                      encode_t_dim -- Dimension of the condition embedding            
-        """
-        
-        super(SimpleUNet, self).__init__()
+    def __init__(self, embed_dim, scale=30.):
+        super().__init__()
+        # Randomly sample weights during initialization. These weights are fixed
+        # during optimization and are not trainable.
+        self.W = nn.Parameter(torch.randn(embed_dim // 2) * scale, requires_grad=False)
 
-        defaults = {
-            'dim': 368,
-            'condition_dim': 0,
-            'hidden_dims': [128, 64, 32],
-            'activation': nn.SiLU(),
-            'output_activation': None,
-            'bayesian': False,
-            'encode_t': False,
-            'encode_t_dim': 64,
-            'encode_c': False,
-            'encode_c_dim': 64,
-        }
-        for k, p in defaults.items():
-            setattr(self, k, param[k] if k in param else p)
-        
-        assert all((d < self.dim for d in self.hidden_dims)), \
-        'Hidden dimensions must be smaller than the data dimension.'
+    def forward(self, x):
+        x_proj = x * self.W * 2 * torch.pi
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=1)
 
-        self.build_layers()
-    
-    def build_layers(self):
-        # TODO: implement Bayesian layer
-
-        # organise dimensions
-        self.hidden_dims.sort(reverse=True)
-        level_dims = [self.dim] + self.hidden_dims
-        extra_dims = (self.encode_t_dim if self.encode_t else 1) \
-                 + (self.encode_c_dim if self.encode_c else self.condition_dim)
-        
-        # construct layers
-        encoding_layers, decoding_layers = [], []
-        for i in range(len(self.hidden_dims)):
-            dim_hi, dim_lo = level_dims[i:i+2]
-            encoding_layers.append(nn.Linear(dim_hi + extra_dims, dim_lo))
-            decoding_layers.insert(0, nn.Linear(dim_lo + extra_dims, dim_hi))
-        self.encoding_layers = nn.ModuleList(encoding_layers)
-        self.decoding_layers = nn.ModuleList(decoding_layers)
-
-        # TODO: Add normalisation layers
-        self.layer_norms = nn.ModuleList([
-            nn.LayerNorm(d+extra_dims)
-            for d in level_dims[:-1] + level_dims[len(level_dims):0:-1]
-        ])
-
-        # construct condition encodings
-        if self.encode_t:
-            self.t_encoding = nn.Linear(1, self.encode_t_dim)
-        if self.encode_c:
-            self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
-
-    def forward(self, x, t, c=None):
-
-        # handle conditional inputs
-        if self.encode_t:
-            t = self.t_encoding(t)
-        if self.condition_dim == 0:
-            condition = t
-        else:
-            if self.encode_c:
-                c = self.c_encoding(c)
-            condition = torch.cat([t, c], 1)
-        
-        self.kl = torch.zeros(())
-
-        residuals = []
-        # encode
-        for i, layer in enumerate(self.encoding_layers):
-            residuals.append(x)
-            x = torch.cat([x, condition], 1)
-            x = self.layer_norms[i](x)
-            x = layer(x)
-            
-            x = self.activation(x)
-
-        # decode
-        for i, layer in enumerate(self.decoding_layers):
-            x = torch.cat([x, condition], 1)
-            x = self.layer_norms[i+len(self.hidden_dims)](x)
-            x = layer(x)
-            x += residuals.pop()
-            if i+1 < len(self.hidden_dims):
-                x = self.activation(x)
-
-        if self.output_activation is not None:
-            x = self.output_activation(x)
-
-        return x
+def add_coord_channels(x, break_dims=None):
+    ndim = len(x.shape)  # TODO: move to init? and other optimisations
+    channels = [x]
+    for d in break_dims:
+        coord = torch.linspace(0, 1, x.shape[d], device=x.device)
+        cast_shape = np.where(np.arange(ndim) == d, -1, 1)
+        expand_shape = np.where(np.arange(ndim) == 1, 1, x.shape)
+        channels.append(coord.view(*cast_shape).expand(*expand_shape))
+    return torch.cat(channels, dim=1)
 
 # modified from https://github.com/AghdamAmir/3D-UNet/blob/main/unet3d.py
 class Conv3DBlock(nn.Module):
     """
-    The basic block for double 3x3x3 convolutions in the analysis path
-    -- __init__()
-    :param in_channels -> number of input channels
-    :param out_channels -> desired number of output channels
-    :param bottleneck -> specifies the bottlneck block
-    -- forward()
-    :param input -> input Tensor to be convolved
-    :return -> Tensor
+    Downsampling block for U-Net.
+
+    __init__ parameters:
+        in_channels  -- number of input channels
+        out_channels -- desired number of output channels
+        down_kernel  -- kernel for the downsampling operation
+        down_stride  -- stride for the downsampling operation
+        down_pad     -- size of the circular padding
+        cond_dim     -- dimension of conditional input
+        bottleneck   -- whether this is the bottlneck block
+        break_dims   -- the index of dimensions at which translation symmetry
+                        should be broken
     """
 
-    def __init__(self, in_channels, out_channels, cond_dim=None, cond_layers=1, bottleneck=False):
+    def __init__(self, in_channels, out_channels, down_kernel=None, down_stride=None,
+                 down_pad=None, cond_dim=None, bottleneck=False, break_dims=None):
+
         super(Conv3DBlock, self).__init__()
+
         self.out_channels = out_channels
-        #self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.cond_block = self.make_condition_block(cond_dim=cond_dim,cond_layers=cond_layers)
-        self.conv1 = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
+        self.cond_layer = nn.Linear(cond_dim, out_channels)
+        self.break_dims = break_dims or []
+        self.conv1 = nn.Conv3d(
+            in_channels=in_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=1
+        )
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
-        self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
+        self.conv2 = nn.Conv3d(
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=1
+        )
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(kernel_size=(3, 2, 3), stride=(3, 2, 3))
-
-    def make_condition_block(self, cond_dim, cond_layers):
-        # Use linear layers
-        linear = nn.Linear(cond_dim, cond_dim)
-        layers = [linear, nn.SiLU()]
-
-        for _ in range(1, cond_layers - 1):
-            linear = nn.Linear(cond_dim, cond_dim)
-            layers.append(linear)
-            layers.append(nn.SiLU())
-
-        linear = nn.Linear(cond_dim, self.out_channels)
-        layers.append(linear)
-
-        return nn.Sequential(*layers)
-
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
+                kernel_size=down_kernel, stride=down_stride, padding=down_pad
+            )
 
     def forward(self, input, condition=None):
 
-        res = self.conv1(input)
+        # conv1
+        res = add_coord_channels(input, self.break_dims)
+        res = self.conv1(res)
+
+        # conditioning
         if condition is not None:
-            res = res + self.cond_block(condition).view(-1, self.out_channels, 1, 1, 1)
+            res = res + self.cond_layer(condition).view(
+                -1, self.out_channels, 1, 1, 1
+            )
         res = self.act(self.bn1(res))
+
+        # conv2
+        res = add_coord_channels(res, self.break_dims)
         res = self.act(self.bn2(self.conv2(res)))
+
+        # pooling
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = add_coord_channels(res, self.break_dims)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
 
 
 class UpConv3DBlock(nn.Module):
+
     """
-    The basic block for upsampling followed by double 3x3x3 convolutions in the synthesis path
-    -- __init__()
-    :param in_channels -> number of input channels
-    :param out_channels -> number of residual connections' channels to be concatenated
-    :param last_layer -> specifies the last output layer
-    :param num_classes -> specifies the number of output channels for dispirate classes
-    -- forward()
-    :param input -> input Tensor
-    :param residual -> residual connection to be concatenated with input
-    :return -> Tensor
+    Upsampling block for U-Net.
+
+    __init__ parameters:
+        in_channels    -- number of input channels
+        out_channels   -- desired number of output channels
+        up_kernel      -- kernel for the upsampling operation
+        up_stride      -- stride for the upsampling operation
+        up_crop        -- size of cropping in the circular dimension
+        cond_dim       -- dimension of conditional input
+        output_padding -- argument forwarded to ConvTranspose
+        break_dims     -- the index of dimensions at which translation symmetry
+                          should be broken
     """
 
-    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, cond_layers=1, num_classes=None):
+    def __init__(self, in_channels, out_channels, up_kernel=None, up_stride=None,
+                 up_crop=0, cond_dim=None, output_padding=0, break_dims=None):
+
         super(UpConv3DBlock, self).__init__()
-        assert (last_layer == False and num_classes == None) or (
-            last_layer == True and num_classes != None), 'Invalid arguments'
+
         self.out_channels = out_channels
-        #self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
-        self.upconv1 = nn.ConvTranspose3d(in_channels=in_channels, out_channels=out_channels, kernel_size=(3, 2, 3), stride=(3, 2, 3))
+        self.cond_layer = nn.Linear(cond_dim, out_channels)
+        self.break_dims = break_dims or []
+        self.upconv1 = nn.ConvTranspose3d(
+            in_channels=in_channels+len(self.break_dims),
+            out_channels=out_channels, kernel_size=up_kernel, stride=up_stride,
+            padding=up_crop, output_padding=output_padding
+        )
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
-        self.conv1 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
-        self.conv2 = nn.Conv3d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3, 3, 3), padding=1)
-        self.last_layer = last_layer
-        if last_layer:
-            self.conv3 = nn.Conv3d(in_channels=out_channels, out_channels=num_classes, kernel_size=(1, 1, 1))
-
-    def make_condition_block(self, cond_dim, cond_layers):
-        # Use linear layers
-        linear = nn.Linear(cond_dim, cond_dim)
-        layers = [linear, nn.SiLU()]
-
-        for _ in range(1, cond_layers - 1):
-            linear = nn.Linear(cond_dim, cond_dim)
-            layers.append(linear)
-            layers.append(nn.SiLU())
-
-        linear = nn.Linear(cond_dim, self.out_channels)
-        layers.append(linear)
-
-        return nn.Sequential(*layers)
+        self.conv1 = nn.Conv3d(
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=1
+        )
+        self.conv2 = nn.Conv3d(
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=1
+        )
 
     def forward(self, input, residual=None, condition=None):
 
         # upsample
-        out = self.upconv1(input)
+        out = add_coord_channels(input, self.break_dims)
+        out = self.upconv1(out)
 
         # residual connection
         if residual != None:
             out = out + residual
+
+        # conv1
+        out = add_coord_channels(out, self.break_dims)
         out = self.conv1(out)
+
+        # conditioning
         if condition is not None:
-            out = out + self.cond_block(condition).view(-1, self.out_channels, 1, 1, 1)
+            out = out + self.cond_layer(condition).view(
+                -1, self.out_channels, 1, 1, 1
+            )
         out = self.act(self.bn1(out))
+
+        # conv2
+        out = add_coord_channels(out, self.break_dims)
         out = self.act(self.bn2(self.conv2(out)))
-        if self.last_layer:
-            out = self.conv3(out)
+
         return out
 
 
@@ -238,18 +171,23 @@ class UNet(nn.Module):
     """
     :param param: A dictionary containing the relevant network parameters:
                   
-                  dim -- The data dimension.
-                  condition_dim -- Dimension of conditional input
-                  in_channels -- Number of channels in the input
-                  out_channels -- Number of channels in the network output
-                  level_channels -- Number of channels at each level (count top-down)       
-                  encode_t -- Whether or not to embed the time input
-                  encode_t_dim -- Dimension of the time embedding
-                  encode_t -- Whether or not to embed the conditional input
-                  encode_t_dim -- Dimension of the condition embedding            
-                  activation -- Activation function for hidden layers
-                  output_activation -- Activation function for output layer
-                  bayesian -- Whether or not to use bayesian layers
+        dim -- The data dimension.
+        condition_dim  -- Dimension of conditional input
+        in_channels    -- Number of channels in the input
+        out_channels   -- Number of channels in the network output
+        level_channels -- Number of channels at each level (count top-down)
+        level_kernels  -- Kernel shape for the up/down sampling operations
+        level_strides  -- Stride shape for the up/down sampling operations
+        level_pads     -- Padding for the up/down sampling operations
+        encode_t       -- Whether or not to embed the time input
+        encode_t_dim   -- Dimension of the time embedding
+        encode_t_scale -- Scale for the Gaussian Fourier projection
+        encode_c       -- Whether or not to embed the conditional input
+        encode_c_dim   -- Dimension of the condition embedding            
+        activation     -- Activation function for hidden layers
+        break_dims     -- the index of dimensions at which translation symmetry
+                          should be broken                  
+        bayesian       -- Whether or not to use bayesian layers
     """
 
     def __init__(self, param):
@@ -260,24 +198,28 @@ class UNet(nn.Module):
             'condition_dim': 0,
             'in_channels': 1,
             'out_channels': 1,
-            'level_channels': [16, 64, 128],
+            'level_channels': [32, 64, 128],
+            'break_dims': None,
+            'level_kernels': [[3, 2, 3], [3, 2, 3]],
+            'level_strides': [[3, 2, 3], [3, 2, 3]],
+            'level_pads': [0, 0],
             'encode_t': False,
             'encode_t_dim': 32,
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
-            'cond_layers': 4,
             'activation': nn.SiLU(),
-            'output_activation': None,
             'bayesian': False,
         }
-            
+
         for k, p in defaults.items():
             setattr(self, k, param[k] if k in param else p)
-        
+
+        self.break_dims = self.break_dims or []
+
         # Conditioning
         self.total_condition_dim = (self.encode_t_dim if self.encode_t else 1) \
-         + (self.encode_c_dim if self.encode_c else self.condition_dim)
+            + (self.encode_c_dim if self.encode_c else self.condition_dim)
 
         if self.encode_t_dim:
             fourier_proj = GaussianFourierProjection(
@@ -287,35 +229,47 @@ class UNet(nn.Module):
                 fourier_proj, nn.Linear(self.encode_t_dim, self.encode_t_dim)
             )
         if self.encode_c_dim:
-            self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
-            
-        # Encoding/decoding blocks 
-        level_1_chnls, level_2_chnls, bottleneck_chnl = self.level_channels
-        self.a_block1 = Conv3DBlock(
-            in_channels=self.in_channels, out_channels=level_1_chnls,
-            cond_dim=self.total_condition_dim, cond_layers=self.cond_layers)
+            # self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
+            self.c_encoding = nn.Sequential(
+                nn.Linear(self.condition_dim, self.encode_c_dim),
+                nn.ReLU(),
+                nn.Linear(self.encode_c_dim, self.encode_c_dim)
+            )
 
-        self.a_block2 = Conv3DBlock(
-            in_channels=level_1_chnls, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
+        *level_channels, bottle_channel = self.level_channels
+
+        # Downsampling blocks
+        self.down_blocks = nn.ModuleList([
+            Conv3DBlock(
+                n, m, self.level_kernels[i], self.level_strides[i], self.level_pads[i],
+                break_dims=self.break_dims, cond_dim=self.total_condition_dim
+            ) for i, (n, m) in enumerate(pairwise([self.in_channels] + level_channels))
+        ])
+
+        # Bottleneck block
+        self.bottleneck_block = Conv3DBlock(
+            level_channels[-1], bottle_channel, bottleneck=True,
+            break_dims=self.break_dims, cond_dim=self.total_condition_dim,
         )
-        self.bottleNeck = Conv3DBlock(
-            in_channels=level_2_chnls, out_channels=bottleneck_chnl,
-            bottleneck=True, cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
+
+        # Upsampling blocks
+        self.up_blocks = nn.ModuleList([
+            UpConv3DBlock(
+                n, m, self.level_kernels[-1 -i], self.level_strides[-1-i], self.level_pads[-1-i],
+                break_dims=self.break_dims, cond_dim=self.total_condition_dim
+            ) for i, (n, m) in enumerate(pairwise([bottle_channel] + level_channels[::-1]))
+        ])
+
+        # Output layer
+        self.output_layer = nn.Conv3d(
+            in_channels=level_channels[0]+len(self.break_dims),
+            out_channels=self.out_channels, kernel_size=(1, 1, 1)
         )
-        self.s_block2 = UpConv3DBlock(
-            in_channels=bottleneck_chnl, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim,cond_layers=self.cond_layers
-        )
-        self.s_block1 = UpConv3DBlock(
-            in_channels=level_2_chnls, out_channels=level_1_chnls,
-            num_classes=self.out_channels, cond_dim=self.total_condition_dim,
-            last_layer=True,cond_layers=self.cond_layers
-        )
+        
         self.kl = torch.zeros(())
-        
+
     def forward(self, x, t, c=None):
-        
+
         if self.encode_t:
             t = self.t_encoding(t)
         if c is None:
@@ -325,174 +279,260 @@ class UNet(nn.Module):
                 c = self.c_encoding(c)
             condition = torch.cat([t, c], 1)
 
-        #Analysis path forward feed
-        out, residual_level1 = self.a_block1(x, condition)
-        out, residual_level2 = self.a_block2(out, condition)
-        out, _ = self.bottleNeck(out, condition)
-        
-        # Synthesis path forward feed
-        out = self.s_block2(out, residual_level2, condition)
-        out = self.s_block1(out, residual_level1, condition)
-        
+        residuals = []
+        out = x
+
+        # down path
+        for down in self.down_blocks:
+            out, res = down(out, condition)
+            residuals.append(res)
+
+        # bottleneck
+        out, _ = self.bottleneck_block(out, condition)
+
+        # up path
+        for up in self.up_blocks:
+            out = up(out, residuals.pop(), condition)
+
+        # output
+        out = add_coord_channels(out, self.break_dims)
+        out = self.output_layer(out)
+
         return out
 
 
-class PaddedConv3DBlock(nn.Module):
+class CylindricalConv3DBlock(nn.Module):
     """
-    The basic block for double 3x3x3 convolutions in the analysis path
-    -- __init__()
-    :param in_channels -> number of input channels
-    :param out_channels -> desired number of output channels
-    :param bottleneck -> specifies the bottlneck block
-    -- forward()
-    :param input -> input Tensor to be convolved
-    :return -> Tensor
+    Downsampling block for cylindrical U-Net. These use circular padding in the
+    angular direction prior to convolution. Convolutions add channels corresponding
+    to dimensions in which the operations should not be translation equivariant.
+
+    __init__ parameters:
+        in_channels  -- number of input channels
+        out_channels -- desired number of output channels
+        down_kernel  -- kernel for the downsampling operation
+        down_stride  -- stride for the downsampling operation
+        cond_dim     -- dimension of conditional input
+        break_dims   -- the index of dimensions at which translation symmetry should be broken
+        bottleneck   -- whether this is the bottlneck block
     """
 
-    def __init__(self, in_channels, out_channels, cond_dim=None, bottleneck=False) -> None:
+    def __init__(self, in_channels, out_channels, down_kernel=None, down_stride=None,
+                 cond_dim=None, break_dims=None, bottleneck=False):
 
-        super(PaddedConv3DBlock, self).__init__()
+        super(CylindricalConv3DBlock, self).__init__()
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.conv1 = nn.Conv3d(
-            in_channels=in_channels, out_channels=out_channels, kernel_size=3,
-            padding=1
-        )
-        self.bn1 = nn.BatchNorm3d(num_features=out_channels)
-        self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels, kernel_size=3,
-            padding=1
-        )
-        self.bn2 = nn.BatchNorm3d(num_features=out_channels)
+        self.break_dims = break_dims or []
         self.act = nn.SiLU()
+        self.bn1 = nn.BatchNorm3d(num_features=out_channels)
+        self.bn2 = nn.BatchNorm3d(num_features=out_channels)
+        self.conv1 = nn.Conv3d(
+            in_channels=in_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
+        )
+        self.conv2 = nn.Conv3d(
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
+        )
+        self.circ_pad = lambda x, p: F.pad(x, (0, 0, 0, p, 0, 0), mode='circular')
+        
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(kernel_size=3, stride=(3, 2, 2))
-
+            self.down_pad_size = (
+                (down_kernel if type(down_kernel) is int else down_kernel[-2])
+              - (down_stride if type(down_stride) is int else down_stride[-2])
+            )
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
+                kernel_size=down_kernel, stride=down_stride
+            )
+            
     def forward(self, input, condition=None):
 
-        res = self.conv1(input)
+        # conv1
+        res = add_coord_channels(input, self.break_dims)
+        res = self.circ_pad(res, 2)
+        res = self.conv1(res)
+
+        # conditioning
         if condition is not None:
-            res = res + \
-                self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
+            res = res + self.cond_layer(condition).view(
+                -1, self.out_channels, 1, 1, 1
+            )
         res = self.act(self.bn1(res))
+
+        # conv2
+        res = add_coord_channels(res, self.break_dims)
+        res = self.circ_pad(res, 2)
         res = self.act(self.bn2(self.conv2(res)))
+
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = self.circ_pad(res, self.down_pad_size)
+            out = add_coord_channels(out, self.break_dims)            
+            out = self.pooling(out)
         else:
             out = res
         return out, res
 
 
-class PaddedUpConv3DBlock(nn.Module):
+class CylindricalUpConv3DBlock(nn.Module):
+
     """
-    The basic block for upsampling followed by double 3x3x3 convolutions in the synthesis path
-    -- __init__()
-    :param in_channels -> number of input channels
-    :param out_channels -> number of residual connections' channels to be concatenated
-    :param last_layer -> specifies the last output layer
-    :param num_classes -> specifies the number of output channels for dispirate classes
-    -- forward()
-    :param input -> input Tensor
-    :param residual -> residual connection to be concatenated with input
-    :return -> Tensor
+    Upsampling block for cylindrical U-Net. These use circular padding in the
+    angular direction prior to convolutions. No padding is used before
+    ConvTranpose operations, but the output is cropped, optionally averaging
+    overlapping regions. Convolutions add channels corresponding to dimensions
+    in which the operations should not be translation equivariant.
+
+    __init__ parameters:
+        in_channels    -- number of input channels
+        out_channels   -- desired number of output channels
+        up_kernel      -- kernel for the upsampling operation
+        up_stride      -- stride for the upsampling operation
+        use_circ_crop  -- whether to average opposite ends when cropping
+        cond_dim       -- dimension of conditional input
+        output_padding -- argument forwarded to ConvTranspose
+        break_dims     -- the index of dimensions at which translation symmetry
+                          should be broken
     """
 
-    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, num_classes=None):
+    def __init__(self, in_channels, out_channels, up_kernel=None, up_stride=None,
+                 cond_dim=None, output_padding=0, use_circ_crop=False, break_dims=None):
 
-        super(PaddedUpConv3DBlock, self).__init__()
-
-        assert (last_layer == False and num_classes == None) or (
-            last_layer == True and num_classes != None), 'Invalid arguments'
+        super(CylindricalUpConv3DBlock, self).__init__()
 
         self.out_channels = out_channels
         self.cond_layer = nn.Linear(cond_dim, out_channels)
-        self.upconv1 = nn.ConvTranspose3d(
-            in_channels=in_channels, out_channels=out_channels, kernel_size=3,
-            stride=(3, 2, 2)
-        )
+        self.break_dims = break_dims or []
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm3d(num_features=out_channels)
         self.bn2 = nn.BatchNorm3d(num_features=out_channels)
         self.conv1 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels, kernel_size=3,
-            padding=1
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
         self.conv2 = nn.Conv3d(
-            in_channels=out_channels, out_channels=out_channels, kernel_size=3,
-            padding=1
+            in_channels=out_channels+len(self.break_dims), bias=False,
+            out_channels=out_channels, kernel_size=3, padding=(1, 0, 1)
         )
-        self.last_layer = last_layer
-        if last_layer:
-            self.conv3 = nn.Conv3d(
-                in_channels=out_channels, out_channels=num_classes,
-                kernel_size=(1, 1, 1)
-            )
+        self.upconv1 = nn.ConvTranspose3d(
+            in_channels=in_channels+len(self.break_dims), out_channels=out_channels,
+            kernel_size=up_kernel, stride=up_stride, output_padding=output_padding
+        )
+        self.up_crop_size = (
+            (up_kernel if type(up_kernel) is int else up_kernel[-2])
+          - (up_stride if type(up_stride) is int else up_stride[-2])
+        )        
+        self.circ_pad = lambda x, p: F.pad(x, (0, 0, 0, p, 0, 0), mode='circular')
+        self.use_circ_crop = use_circ_crop
+
+    def circ_crop(self, x):
+        """
+        Cropping operation that averages over cirular padding
+                          X0 | X1 | ... | X7 | X8 | x0 | x1
+                                     |
+                                     V
+            (X0+x0)/2 | (X1+x1)/2 | ... | X7 | X8
+        """
+        C = self.up_crop_size
+
+        # store edge
+        r_edge = x[..., -C:, :]
+        # crop
+        x = x[..., :-C, :]
+        # average with cropped edge
+        x[..., :C, :] = (x[..., :C, :] + r_edge)/2
+
+        return x
 
     def forward(self, input, residual=None, condition=None):
 
         # upsample
-        out = self.upconv1(input)
+        out = add_coord_channels(input, self.break_dims)
+        out = self.upconv1(out)
+        if self.use_circ_crop:
+            out = self.circ_crop(out)
+        else:
+            out = out[..., :-self.up_crop, :]
 
         # residual connection
         if residual != None:
             out = out + residual
-        out = self.conv1(out)
-        if condition is not None:
-            out = out + \
-                self.cond_layer(condition).view(-1, self.out_channels, 1, 1, 1)
-        out = self.act(self.bn1(out))
-        out = self.act(self.bn2(self.conv2(out)))
-        if self.last_layer:
-            out = self.conv3(out)
-        return out
-    
 
-class PaddedUNet(nn.Module):
+        # conv1
+        out = add_coord_channels(out, self.break_dims)
+        out = self.circ_pad(out, 2)
+        out = self.conv1(out)
+
+        # conditioning
+        if condition is not None:
+            out = out + self.cond_layer(condition).view(
+                -1, self.out_channels, 1, 1, 1
+            )
+        out = self.act(self.bn1(out))
+
+        # conv2
+        out = add_coord_channels(out, self.break_dims)
+        out = self.circ_pad(out, 2)
+        out = self.act(self.bn2(self.conv2(out)))
+
+        return out
+
+
+class CylindricalUNet(nn.Module):
     """
     :param param: A dictionary containing the relevant network parameters:
                   
-                  dim -- The data dimension.
-                  condition_dim -- Dimension of conditional input
-                  in_channels -- Number of channels in the input
-                  out_channels -- Number of channels in the network output
-                  level_channels -- Number of channels at each level (count top-down)       
-                  encode_t -- Whether or not to embed the time input
-                  encode_t_dim -- Dimension of the time embedding
-                  encode_t -- Whether or not to embed the conditional input
-                  encode_t_dim -- Dimension of the condition embedding            
-                  activation -- Activation function for hidden layers
-                  output_activation -- Activation function for output layer
-                  bayesian -- Whether or not to use bayesian layers
+                  dim            -- The data dimension.
+                  condition_dim  -- Dimension of conditional input
+                  in_channels    -- Number of channels in the input
+                  out_channels   -- Number of channels in the network output
+                  level_channels -- Number of channels at each level (count top-down)
+                  level_kernels  -- Kernel shape for the up/down sampling operations
+                  level_strides  -- Stride shape for the up/down sampling operations
+                  break_dims     -- Dimensions at which translational symmetry should be broken
+                  encode_t       -- Whether or not to embed the time input
+                  encode_t_dim   -- Dimension of the time embedding
+                  encode_t_scale -- Scale for the Gaussian Fourier projection
+                  encode_c       -- Whether or not to embed the conditional input
+                  encode_c_dim   -- Dimension of the condition embedding
+                  activation     -- Activation function for hidden layers
+                  bayesian       -- Whether or not to use bayesian layers
     """
 
     def __init__(self, param):
 
-        super(PaddedUNet, self).__init__()
+        super(CylindricalUNet, self).__init__()
 
         defaults = {
             'condition_dim': 0,
             'in_channels': 1,
             'out_channels': 1,
-            'level_channels': [16, 64, 128],
+            'level_channels': [32, 64, 128],
+            'level_kernels': [3, 3],
+            'level_strides': [3, 3],
+            'break_dims': None,
             'encode_t': False,
             'encode_t_dim': 32,
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
             'activation': nn.SiLU(),
-            'output_activation': None,
-            'bayesian': False
+            'bayesian': False,
         }
 
         for k, p in defaults.items():
             setattr(self, k, param[k] if k in param else p)
 
+        self.break_dims = self.break_dims or []
+
         # Conditioning
         self.total_condition_dim = (self.encode_t_dim if self.encode_t else 1) \
             + (self.encode_c_dim if self.encode_c else self.condition_dim)
+
         if self.encode_t_dim:
             fourier_proj = GaussianFourierProjection(
                 embed_dim=self.encode_t_dim, scale=self.encode_t_scale
@@ -501,31 +541,42 @@ class PaddedUNet(nn.Module):
                 fourier_proj, nn.Linear(self.encode_t_dim, self.encode_t_dim)
             )
         if self.encode_c_dim:
-            self.c_encoding = nn.Linear(self.condition_dim, self.encode_c_dim)
+            self.c_encoding = nn.Sequential(
+                nn.Linear(self.condition_dim, self.encode_c_dim),
+                nn.ReLU(),
+                nn.Linear(self.encode_c_dim, self.encode_c_dim)
+            )
 
-        # Encoding/decoding blocks
-        level_1_chnls, level_2_chnls, bottleneck_chnl = self.level_channels
-        self.a_block1 = PaddedConv3DBlock(
-            in_channels=self.in_channels, out_channels=level_1_chnls,
-            cond_dim=self.total_condition_dim,
+        *level_channels, bottle_channel = self.level_channels
+
+        # Downsampling blocks
+        self.down_blocks = nn.ModuleList([
+            CylindricalConv3DBlock(
+                n, m, self.level_kernels[i], self.level_strides[i],
+                cond_dim=self.total_condition_dim, break_dims=self.break_dims
+            ) for i, (n, m) in enumerate(pairwise([self.in_channels] + level_channels))
+        ])
+
+        # Bottleneck block
+        self.bottleneck_block = CylindricalConv3DBlock(
+            level_channels[-1], bottle_channel, bottleneck=True,
+            cond_dim=self.total_condition_dim, break_dims=self.break_dims,
         )
-        self.a_block2 = PaddedConv3DBlock(
-            in_channels=level_1_chnls, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim,
+
+        # Upsampling blocks
+        self.up_blocks = nn.ModuleList([
+            CylindricalUpConv3DBlock(
+                n, m, self.level_kernels[-1-i], self.level_strides[-1-i],
+                cond_dim=self.total_condition_dim, break_dims=self.break_dims, use_circ_crop=True,
+            ) for i, (n, m) in enumerate(pairwise([bottle_channel] + level_channels[::-1]))
+        ])
+
+        # Output layer
+        self.output_layer = nn.Conv3d(
+            in_channels=level_channels[0]+len(self.break_dims),
+            out_channels=self.out_channels, kernel_size=(1, 1, 1)
         )
-        self.bottleNeck = PaddedConv3DBlock(
-            in_channels=level_2_chnls, out_channels=bottleneck_chnl,
-            bottleneck=True, cond_dim=self.total_condition_dim
-        )
-        self.s_block2 = PaddedUpConv3DBlock(
-            in_channels=bottleneck_chnl, out_channels=level_2_chnls,
-            cond_dim=self.total_condition_dim,
-        )
-        self.s_block1 = PaddedUpConv3DBlock(
-            in_channels=level_2_chnls, out_channels=level_1_chnls,
-            num_classes=self.out_channels, last_layer=True,
-            cond_dim=self.total_condition_dim,
-        )
+
         self.kl = torch.zeros(())
 
     def forward(self, x, t, c=None):
@@ -539,34 +590,23 @@ class PaddedUNet(nn.Module):
                 c = self.c_encoding(c)
             condition = torch.cat([t, c], 1)
 
-        x = F.pad(x, (0, 0, 1, 2, 0, 0))
-        # downsample 1
-        out, residual_level1 = self.a_block1(x, condition)
-        out = F.pad(out, (0, 1, 0, 0, 0, 0))
-        # downsample 2
-        out, residual_level2 = self.a_block2(out, condition)
+        residuals = []
+        out = x
+
+        # down path
+        for down in self.down_blocks:
+            out, res = down(out, condition)
+            residuals.append(res)
+
         # bottleneck
-        out, _ = self.bottleNeck(out, condition)
-        # upsample 1
-        out = self.s_block2(out, residual_level2, condition)
-        out = out[..., :-1]
-        # upsample 2
-        out = self.s_block1(out, residual_level1, condition)
-        out = out[..., 1:-2, :]
+        out, _ = self.bottleneck_block(out, condition)
+
+        # up path
+        for up in self.up_blocks:
+            out = up(out, residuals.pop(), condition)
+
+        # output
+        out = add_coord_channels(out, self.break_dims)
+        out = self.output_layer(out)
 
         return out
-    
-
-class GaussianFourierProjection(nn.Module):
-    """Gaussian random features for encoding time steps."""
-
-    def __init__(self, embed_dim, scale=30.):
-        super().__init__()
-        # Randomly sample weights during initialization. These weights are fixed
-        # during optimization and are not trainable.
-        self.W = nn.Parameter(torch.randn(embed_dim // 2)
-                              * scale, requires_grad=False)
-
-    def forward(self, x):
-        x_proj = x * self.W * 2 * torch.pi
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=1)

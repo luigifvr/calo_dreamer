@@ -39,7 +39,7 @@ class ARtransformer(nn.Module):
             self.x_embed = nn.Sequential(nn.Linear(1, self.dim_embedding),
                                      nn.Linear(self.dim_embedding, self.dim_embedding))
         if self.c_embed:
-            self.c_embed = nn.Sequential(nn.Linear(1, self.dim_embedding),
+            self.c_embed = nn.Sequential(nn.Linear(1, self.dim_embedding), nn.ReLU(),
                                                nn.Linear(self.dim_embedding, self.dim_embedding))
         self.t_embed = nn.Sequential(GaussianFourierProjection(embed_dim=self.encode_t_dim,
                                                                      scale=self.encode_t_scale),

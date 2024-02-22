@@ -103,20 +103,17 @@ class TBD(GenerativeModel):
 
             return v
 
-        events = []
-
         with torch.no_grad():
             solver = sdeint if self.params.get("use_sde", False) else odeint
             function = SDE(self.net) if self.params.get("use_sde", False) else f
-
-            x_t = solver(function,
-                         x_T,
-                         torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                         **self.params.get("solver_kwargs", {})
-                         ).detach().cpu().numpy()
-
-            events.append(x_t[-1])
-        return np.concatenate(events, axis=0)
+            
+            x_t = solver(
+                function, x_T,
+                torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+                **self.params.get("solver_kwargs", {})
+            )
+            
+        return x_t[-1]
 
     def invert_n(self, samples):
         """

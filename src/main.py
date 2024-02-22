@@ -3,11 +3,10 @@ import os
 import shutil
 import yaml
 import torch
+import Models
+import numpy as np
 
 from documenter import Documenter
-from Models import *
-from Models.tbd import TBD
-import Models
 from challenge_files import evaluate
 
 def main():
@@ -17,6 +16,7 @@ def main():
     parser.add_argument('-p', '--plot', action='store_true', default=False,)
     parser.add_argument('-d', '--model_dir', default=None,)
     parser.add_argument('-ep', '--epoch', default='')
+    parser.add_argument('-g', '--generate', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -24,7 +24,7 @@ def main():
         params = yaml.load(f, Loader=yaml.FullLoader)
     use_cuda = torch.cuda.is_available() and args.use_cuda
 
-    device = 'cuda:0' if use_cuda else 'cpu'
+    device = 'cuda:1' if use_cuda else 'cpu'
     print('device: ', device)
 
     if args.plot:
@@ -54,9 +54,12 @@ def main():
     if not args.plot:
         model.run_training()
     else:
-        model.load(args.epoch)
-        x, c = model.sample_n()
-        model.plot_samples(x, c, name=f"{args.epoch}")
+        if args.generate:
+            model.load(args.epoch)
+            x, c = model.sample_n()
+            model.plot_samples(x, c, name=f"{args.epoch}")
+        else:
+            model.plot_saved_samples(name=f"{args.epoch}")
 
 if __name__=='__main__':
     main()

@@ -35,7 +35,7 @@ def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num
                      alpha=0.8, linewidth=1.0, color='k', where='post')
         main_ax.fill_between(edges, dup(ref_counts_norm+ref_error), dup(ref_counts_norm-ref_error),
                              step='post', color='k', alpha=0.2)
-
+        
         # plot model dists
         gen_counts, edges = np.histogram(gen, bins=bins, density=False)
         gen_counts_norm = gen_counts/gen_counts.sum()
@@ -57,7 +57,7 @@ def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num
         ratio_ax.fill_between(edges, dup(1-ref_error/ref_counts_norm), dup(1+ref_error/ref_counts_norm),
                               step='post', color='k', alpha=0.2)
 
-
+       
         ratio_ax.set_ylim(*ratio_ylim)
         ratio_ax.set_xlim(*main_ax.get_xlim())
         main_ax.set_xticklabels([])

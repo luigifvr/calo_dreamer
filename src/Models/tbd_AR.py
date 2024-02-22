@@ -85,6 +85,7 @@ class TransfusionAR(GenerativeModel):
 
         return loss
 
+    @torch.no_grad()
     def sample_batch(self,c):
         c = c.unsqueeze(-1)
         pred = self.net(c, rev=True)
