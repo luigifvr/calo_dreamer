@@ -1,13 +1,13 @@
-run_name: d2_energy_model
+run_name: d2_energy_model_ARtransformer
 dtype: float32
 
 # Model
 model_type: energy
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -15,7 +15,7 @@ eval_dataset: "2"
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectDims: {start: -45, end: 0},
@@ -26,37 +26,30 @@ transforms: {
 }
 
 # Training
-lr: 1.e-4
+lr: 1.e-3
 max_lr: 2.e-3
 batch_size: 4000
-validate_every: 10
+validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.001
-betas: [0.9, 0.999]
-n_epochs: 20000
-cycle_epochs: 20000
-cycle_pct_start: 0.1
-save_interval: 100_001
+n_epochs: 500
+cycle_epochs: 500
 
 # Sampling
 sample_periodically: False
-sample_every: 10
-sample_every_n_samples: 1001
-solver_kwargs: {method: rk4, options: {step_size: 0.01}}
+solver_kwargs: {method: dopri5, atol: 1.e-4, rtol: 1.e-6}
 
-network: Resnet
+#CFM transformer block
 shape: [45] # number of calorimeter layers
-
-# ResNet block
-intermediate_dim: 512
-n_blocks: 8
+model: TransfusionAR
+network: ARtransformer
+dim_embedding: 64
+n_head: 4
+n_encoder_layers: 4
+n_decoder_layers: 4
+dim_feedforward: 512
+# c_embed: True
+#x_embed: True
 n_con: 1
-layers_per_block: 2
-
 conditional: True
-encode_t: True
-encode_t_dim: 32
-encode_c: True
-encode_c_dim: 32
-normalization: LayerNorm
+# normalization: LayerNorm

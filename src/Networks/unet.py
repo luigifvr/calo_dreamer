@@ -67,7 +67,8 @@ class Conv3DBlock(nn.Module):
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
 
@@ -91,7 +92,8 @@ class Conv3DBlock(nn.Module):
         # pooling
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = add_coord_channels(res, self.break_dims)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
@@ -344,7 +346,10 @@ class CylindricalConv3DBlock(nn.Module):
                 (down_kernel if type(down_kernel) is int else down_kernel[-2])
               - (down_stride if type(down_stride) is int else down_stride[-2])
             )
-            self.pooling = nn.MaxPool3d(kernel_size=down_kernel, stride=down_stride)
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
+                kernel_size=down_kernel, stride=down_stride
+            )
             
     def forward(self, input, condition=None):
 
@@ -368,6 +373,7 @@ class CylindricalConv3DBlock(nn.Module):
         out = None
         if not self.bottleneck:
             out = self.circ_pad(res, self.down_pad_size)
+            out = add_coord_channels(out, self.break_dims)            
             out = self.pooling(out)
         else:
             out = res

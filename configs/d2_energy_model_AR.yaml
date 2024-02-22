@@ -1,4 +1,4 @@
-run_name: d2_energy_model_ARtransformer_5000e
+run_name: d2_energy_model_ARtransformer
 dtype: float32
 
 # Model
@@ -7,7 +7,7 @@ model_type: energy
 # Data
 hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
 eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
-xml_filename: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -15,16 +15,12 @@ eval_dataset: "2"
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml,
+        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectDims: {start: -45, end: 0},
     ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
-    StandardizeFromFile: {
-        mean_path: /remote/gpu05/palacios/calo_dreamer/dat/means_2_1_us.npy,
-        std_path: /remote/gpu05/palacios/calo_dreamer/stds_2_1_us.npy,
-        create: True
-    },
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
 }

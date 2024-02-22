@@ -2,23 +2,20 @@ run_name: d2_2000_epoch_shape_model_light
 dtype: float32
 
 # Model
-model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
+model_type: energy
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge//dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
-eval_cut: 15.15e-3
-shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+        ptype: /remote/gpu02/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectiveUniformNoise: {
@@ -34,8 +31,6 @@ transforms: {
     StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
-    AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
 }
 
 # Training

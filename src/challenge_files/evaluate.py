@@ -525,7 +525,7 @@ def run_from_py(sample, energy, doc, params):
                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
     hlf = HLF.HighLevelFeatures(particle,
-                                filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                     args.dataset.replace('-', '_')))
     
     #Checking for negative values, nans and infinities
@@ -554,7 +554,7 @@ def run_from_py(sample, energy, doc, params):
     )
     reference_shower[reference_shower<args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
 
@@ -748,20 +748,20 @@ def main(raw_args=None):
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
 
-    source_file = h5py.File(args.input_file, 'r')
-    check_file(source_file, args, which='input')
+    with h5py.File(args.input_file, 'r') as source_file:
+        # check_file(source_file, args, which='input')
+        particle = {'1-photons': 'photon', '1-pions': 'pion',
+                    '2': 'electron', '3': 'electron'}[args.dataset]
+        args.particle = particle
+        # minimal readout per voxel, ds1: from Michele, ds2/3: 0.5 keV / 0.033 scaling factor
+        args.min_energy = {'1-photons': 0.001, '1-pions': 0.001,
+                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
-    particle = {'1-photons': 'photon', '1-pions': 'pion',
-                '2': 'electron', '3': 'electron'}[args.dataset]
-    args.particle = particle
-    # minimal readout per voxel, ds1: from Michele, ds2/3: 0.5 keV / 0.033 scaling factor
-    args.min_energy = {'1-photons': 0.001, '1-pions': 0.001,
-                       '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
-
-    hlf = HLF.HighLevelFeatures(particle,
-                                filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
-                                    args.dataset.replace('-', '_')))
-    shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
+        hlf = HLF.HighLevelFeatures(
+            particle, filename='src/challenge_files/binning_dataset_{}.xml'.format(
+                                        args.dataset.replace('-', '_'))
+        )
+        shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
 
     #Checking for negative values, nans and infinities
     print("Checking for negative values, number of negative energies: ")
@@ -781,11 +781,11 @@ def main(raw_args=None):
     print('Storing reference .pkl file in folder: {}'.format(args.source_dir))
     args.reference_file_name = os.path.splitext(args.reference_file_name)[0]
 
-    reference_file = h5py.File(args.reference_file, 'r')
-    check_file(reference_file, args, which='reference')
-
-    reference_shower, reference_energy = extract_shower_and_energy(reference_file,
-                                                                   which='reference', single_energy=args.energy)
+    with h5py.File(args.reference_file, 'r') as reference_file:
+        # check_file(reference_file, args, which='reference')
+        reference_shower, reference_energy = extract_shower_and_energy(
+            reference_file, which='reference', single_energy=args.energy
+        )
     reference_shower[reference_shower<args.cut] = 0.0
 
     #if os.path.exists(os.path.join(args.source_dir, args.reference_file_name + '.pkl')):
@@ -795,7 +795,7 @@ def main(raw_args=None):
     #else:
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
     #save_reference(reference_hlf,

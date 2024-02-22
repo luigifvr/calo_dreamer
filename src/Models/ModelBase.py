@@ -285,15 +285,16 @@ class GenerativeModel(nn.Module):
         np.random.shuffle(ret)
         return ret
 
+    @torch.no_grad()
     def sample_n(self):
 
         self.eval()
 
-        if self.net.bayesian:
-            self.net.map = get(self.params, "fix_mu", False)
-            for bay_layer in self.net.bayesian_layers:
-                bay_layer.random = None
-        sample = []
+        # if self.net.bayesian:
+        #     self.net.map = get(self.params, "fix_mu", False)
+        #     for bay_layer in self.net.bayesian_layers:
+        #         bay_layer.random = None
+        # sample = []
 
         # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
         Einc = torch.tensor(
@@ -423,11 +424,11 @@ class GenerativeModel(nn.Module):
 
     def plot_saved_samples(self, name="", energy=None, doc=None):
         if doc is None: doc = self.doc
-        eval_mode = self.params.get('eval_mode', 'all')
+        mode = self.params.get('eval_mode', 'all')
         script_args = (
             f"-i {doc.basedir}/samples{name}.hdf5 "
-            f"-r {self.params['eval_hdf5_file']} -m {eval_mode} --cut {self.params['eval_cut']} "
-            f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/"
+            f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
+            f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/ --save_mem"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())
 

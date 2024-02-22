@@ -1,13 +1,13 @@
-run_name: d3_1200_epoch_shape_model
+run_name: d3_100_epoch_shape_model_doubleconv
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
+energy_model: /remote/gpu02/ore/calo_dreamer/results/20240213_104847_d2_energy_model_ARtransformer
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_2.hdf5
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_3.xml
+hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_3_1_full.hdf5
+eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_3_2_full.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_3.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -17,7 +17,7 @@ shape: [1, 45, 50, 18]
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_3.xml,
+        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_3.xml,
         xml_file: electron
     },
     SelectiveUniformNoise: {
@@ -39,15 +39,15 @@ transforms: {
 
 # Training
 lr: 1.e-3
-max_lr: 1.e-3
-batch_size: 500
+max_lr: 2.e-3
+batch_size: 400
 validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 # weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 1200
-cycle_epochs: 1200
+n_epochs: 1000
+cycle_epochs: 1000
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -64,7 +64,6 @@ break_dims: [2, 4]
 level_channels: [32, 64, 128]
 level_kernels: [[3,5,3], [3,4,2]]
 level_strides: [[3,3,3], [3,3,2]]
-level_pads: [0, 0]
 encode_t: True
 encode_t_dim: 100
 encode_c: True
