@@ -30,14 +30,14 @@ transforms: {
 # Training
 lr: 1.e-3
 max_lr: 1.e-3
-batch_size: 128
+batch_size: 200
 validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 300
-cycle_epochs: 300
+n_epochs: 100
+cycle_epochs: 100
 cycle_pct_start: 0.2
 save_interval: 100_001
 
@@ -53,8 +53,8 @@ condition_dim: 46
 # AutoEncoder
 ae_loss: 'bce'
 ae_level_channels: [64, 4]
-ae_level_kernels: [[3,5,3]]
-ae_level_strides: [[3,3,1]]
+ae_level_kernels: [[3,4,3]]
+ae_level_strides: [[3,2,1]]
 ae_level_pads: [[0,0,0]]
 ae_break_dims: [2,4]
 ae_encode_c: True
