@@ -1,4 +1,4 @@
-run_name: BespokeMidpoint_4_dopri1e3
+run_name: BespokeMidpoint_3_largebatch
 dtype: float32
 
 # Data
@@ -6,10 +6,10 @@ shape: [1, 45, 16, 9]
 
 # Solver
 model: BespokeMidpoint
-num_steps: 32 # number of integration steps (NFE varies with base solver)
+num_steps: 3 # number of integration steps (NFE varies with base solver)
 truth_tols: # setting for the dopri5 'truth' solver
-  atol: 1.e-4
-  rtol: 1.e-4
+  atol: 1.e-5
+  rtol: 1.e-5
 
 # Flow model
 shape_model: /home/aore/calo_dreamer/results/20240207_025523_d2_2000_epoch_shape_model_geom
@@ -17,7 +17,7 @@ shape_model: /home/aore/calo_dreamer/results/20240207_025523_d2_2000_epoch_shape
 # Training
 loss: gte
 iterations: 5000
-batch_size: 40
+batch_size: 500
 lr: 1.e-3
 loss_window: 250
 
