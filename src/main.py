@@ -1,13 +1,10 @@
 import argparse
-import os
 import shutil
 import yaml
 import torch
 import Models
-import numpy as np
 
 from documenter import Documenter
-from challenge_files import evaluate
 
 def main():
     parser = argparse.ArgumentParser(description='Fast Calorimeter Simulation with CaloDreamer')
@@ -24,7 +21,7 @@ def main():
         params = yaml.load(f, Loader=yaml.FullLoader)
     use_cuda = torch.cuda.is_available() and args.use_cuda
 
-    device = 'cuda:1' if use_cuda else 'cpu'
+    device = 'cuda' if use_cuda else 'cpu'
     print('device: ', device)
 
     if args.plot:
