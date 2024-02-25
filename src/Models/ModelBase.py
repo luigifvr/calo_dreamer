@@ -318,8 +318,7 @@ class GenerativeModel(nn.Module):
         ).unsqueeze(1)
         
         # transform Einc to basis used in training
-        dummy = None
-        transformed_cond = Einc
+        dummy, transformed_cond = None, Einc
         for fn in self.transforms:
             if hasattr(fn, 'cond_transform'):
                 dummy, transformed_cond = fn(dummy, transformed_cond)
@@ -372,7 +371,7 @@ class GenerativeModel(nn.Module):
                 self.params.get('particle_type'),
                 self.params.get('xml_filename'),
                 self.params.get('val_frac'),
-                self.params.get('batch_size'),
+                self.params.get('batch_size_sample'),
                 self.transforms,
                 self.params.get('eps', 1.e-10),
                 device=self.device,
@@ -380,7 +379,6 @@ class GenerativeModel(nn.Module):
                 width_noise=self.params.get('width_noise', 1.e-6),
                 single_energy=self.params.get('single_energy', None)
             )
-
 
         recos = []
         energies = []

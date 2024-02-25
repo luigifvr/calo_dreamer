@@ -11,13 +11,13 @@ from Util.util import loss_cbvae
 from challenge_files import *
 from challenge_files import evaluate
 
+
 class AE(GenerativeModel):
 
     def __init__(self, params, device, doc):
         super().__init__(params, device, doc)
         self.lat_mean = None
         self.lat_std = None
-        self.shape = self.params.get('ae_latent_shape')
         self.kl = self.params.get('ae_kl')
         # parameters for autoencoder
 
@@ -49,7 +49,6 @@ class AE(GenerativeModel):
         if self.params.get('ae_kl', False):
             mu, logvar = z[0], z[1]
             z = self.net.reparameterize(mu, logvar)
-            #z = z.reshape(-1,*self.shape)
             rec = self.net.decode(z, c)
             return rec, mu, logvar
         return self.net.decode(z, c)
@@ -57,8 +56,7 @@ class AE(GenerativeModel):
     def batch_loss(self, x):
         
         x, c, _ = self.get_conditions_and_input(x)
-        c = c.repeat_interleave(x.shape[1], 0) # repeat condition for each layer
-        x = x.flatten(0,1).unsqueeze(1) # flatten B,L and add channel
+        x, c = self.flatten_layer_to_batch(x, c)
 
         #calculate loss for 1 batch
         if self.params.get('ae_kl', False):
@@ -107,12 +105,14 @@ class AE(GenerativeModel):
 
     def sample_batch(self, x):
         with torch.no_grad():
-            x_inp, condition, weights = self.get_conditions_and_input(x)
+            x, c, weights = self.get_conditions_and_input(x)
+            x, c_flat = self.flatten_layer_to_batch(x, c)
             if self.params.get('ae_kl', False):
                 rec, mu, logvar = self.forward(x)
             else:
-                rec = self.net(x_inp, condition)
-        return rec.detach().cpu(), condition.detach().cpu()
+                rec = self.net(x, c_flat)
+            rec = self.unflatten_layer_from_batch(rec)
+        return rec.detach().cpu(), c.detach().cpu()
 
     def plot_samples(self, samples, conditions, name="", energy=None, mode='all'): #TODO
         transforms = self.transforms
@@ -129,6 +129,7 @@ class AE(GenerativeModel):
 
     @torch.no_grad()
     def encode(self, x, c):
+        x, c = self.flatten_layer_to_batch(x, c)
         c = self.net.c_encoding(c)
         enc = self.net.encode(x,c)
         return enc
@@ -136,7 +137,8 @@ class AE(GenerativeModel):
     @torch.no_grad()
     def decode(self, x, c):
         c = self.net.c_encoding(c)
-        return self.net.decode(x, c)
+        x = self.net.decode(x, c)
+        return self.unflatten_layer_from_batch(x)
 
     @torch.no_grad()
     def reparameterize(self, mu, logvar):
@@ -144,6 +146,15 @@ class AE(GenerativeModel):
         esp = torch.randn(*mu.size()).to(mu.device)
         z = mu + std*esp
         return z
+    
+    def flatten_layer_to_batch(self, x, c):
+        c = c.repeat_interleave(self.shape[0], 0) # repeat condition for each layer
+        x = x.flatten(0,1).unsqueeze(1) # flatten B,L and add channel
+        return x, c
+
+    def unflatten_layer_from_batch(self, x):
+        x = x.squeeze().unflatten(0, (-1, self.shape[0])) # remove channel and unflatten B,L
+        return x
 
 #temp
 import torch.nn.functional as F
