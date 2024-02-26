@@ -1,4 +1,4 @@
-run_name: d2_vit
+run_name: d2_vit_500
 dtype: float32
 
 # Model
@@ -46,8 +46,8 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 1.e-3
 betas: [0.9, 0.999]
-n_epochs: 1000
-cycle_epochs: 1000
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.1
 save_interval: 100_001
 
