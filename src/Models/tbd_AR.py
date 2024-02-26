@@ -64,7 +64,18 @@ class TransfusionAR(GenerativeModel):
             loss_terms: dictionary with loss contributions
         """
         x, c, _ = self.get_condition_and_input(input)
+
+        if self.latent: # encode x into autoencoder latent space
+            x = self.ae.encode(x, c)
+            if self.ae.kl:
+                x = self.ae.reparameterize(x[0], x[1])
+            x = self.ae.unflatten_layer_from_batch(x)
+            print(f'{x.shape=}')
+
+        # adjust shapes
         c = c.unsqueeze(-1)
+        print(f'{c.shape=}')
+
         # Sample time steps
         t = torch.rand(
             list(x.shape[:2]) + [1]*(x.ndim-2), dtype=x.dtype, device=x.device
@@ -81,8 +92,12 @@ class TransfusionAR(GenerativeModel):
 
     @torch.no_grad()
     def sample_batch(self,c):
-        c = c.unsqueeze(-1)
-        return self.net(c, rev=True)
+        sample = self.net(c.unsqueeze(-1), rev=True)
+        print(f'{sample.shape=}')
+        if self.latent: # decode the generated sample
+            sample, c = self.ae.flatten_layer_to_batch(sample, c)
+            sample = self.ae.decode(sample.squeeze(), c)
+        return sample
 
 def linear_trajectory(x_0, x_1, t):
     x_t = (1 - t) * x_0 + t * x_1

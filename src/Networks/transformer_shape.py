@@ -105,7 +105,7 @@ class ARtransformer_shape(nn.Module):
         device = c.device
 
         net = self.subnet
-        x_0 = torch.randn((batch_size, 1, self.params["shape"][2],self.params["shape"][3]), device=device, dtype=dtype)
+        x_0 = torch.randn((batch_size, self.params["shape"][1], self.params["shape"][2],self.params["shape"][3]), device=device, dtype=dtype)
         #x_0 = torch.randn((batch_size, self.dims_in), device=device, dtype=dtype)
 
         # NN wrapper to pass into ODE solver
@@ -132,7 +132,7 @@ class ARtransformer_shape(nn.Module):
 
     def forward(self, c,x_t=None, t=None, x=None, rev=False):
         if not rev:
-            x = rearrange(x, " b c l x y -> b (c l) (x y)")
+            x = rearrange(x, "b l c x y -> b l (c x y)")
             xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
                 src=self.compute_embedding(
@@ -149,18 +149,22 @@ class ARtransformer_shape(nn.Module):
                     (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
                 ).triu(diagonal=1),
             )
-            t = rearrange(t, "b l c x y -> b (l c) (x y)")
+            t = rearrange(t, "b l c x y -> b l (c x y)")
+            
+            # t = self.t_embed(t).repeat_interleave(self.params['shape'][1], 0)
             t = self.t_embed(t)
             x_t = rearrange(x_t, "b l c x y -> (b l) c x y")
+            
             pred = self.subnet(x_t, torch.cat([t, embedding], dim=-1))
+    
             pred = rearrange(pred, "(b l) c x y -> b l c x y", l = 45)
         else:
             #x = torch.zeros((c.shape[0], 1, self.dims_in), device=c.device, dtype=c.dtype)
-            x = torch.zeros((c.shape[0], 1, 1, self.params["shape"][2],self.params["shape"][3]), device=c.device, dtype=c.dtype)
+            x = torch.zeros((c.shape[0], 1, self.params['shape'][1], self.params["shape"][2],self.params["shape"][3]), device=c.device, dtype=c.dtype)
             c_embed = self.compute_embedding(
             c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.n_energy_layers):
-                x = rearrange(x, " b c l x y -> b (c l) (x y)")
+                x = rearrange(x, " b l c x y -> b l (c x y)")
                 embedding = self.transformer(
                     src=c_embed,
                     tgt=self.compute_embedding(
@@ -172,10 +176,12 @@ class ARtransformer_shape(nn.Module):
                         (x.shape[1], x.shape[1]), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
+
                 x_new = self.sample_dimension(
                     embedding[:, -1:,:]
                 )
-                x = rearrange(x, " b (l c) (x y) -> b l c x y", c=1, x=self.params["shape"][2])
+                
+                x = rearrange(x, " b l (c x y) -> b l c x y", c=self.params["shape"][1], x=self.params["shape"][2])
                 #x_new = rearrange(x_new, "(b l) c x y -> b l c x y")
                 x = torch.cat((x, x_new), dim=1)
 
@@ -302,7 +308,7 @@ class Conv2DBlock(nn.Module):
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool2d(kernel_size=(4, 9), stride=(4, 9))
+            self.pooling = nn.MaxPool2d(kernel_size=3, stride=2)
             # self.pooling = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3,3), padding=1,
             #                          stride=(2,3))
 
@@ -364,8 +370,8 @@ class UpConv2DBlock(nn.Module):
         # self.cond_layer = nn.Linear(cond_dim, out_channels)
         # self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
         self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
-        self.upconv1 = nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=(4, 9),
-                                          stride=(4, 9))
+        self.upconv1 = nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3,
+                                          stride=2)
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm2d(num_features=out_channels)
         self.bn2 = nn.BatchNorm2d(num_features=out_channels)
