@@ -1,4 +1,4 @@
-run_name: d2_latent_test
+run_name: d2_latent_vit_smallpatch_1000
 dtype: float32
 
 # Data
@@ -13,37 +13,31 @@ eval_cut: 15.15e-3
 shape: [4, 15, 7, 7] # shape of the autoencoder embedding
 
 # Model
+model: TBD
 model_type: shape
-network: UNet
+network: ViT
 condition_dim: 46
-in_channels: 4 # number of AE embedding channels
-out_channels: 4 # number of AE embedding channels
-level_channels: [64, 128, 128]
-level_kernels: [3, 3]
-# level_strides: [2, 2]
-level_strides: [[2,1,1], 1]
-level_pads: [0, 0]
-break_dims: [2, 4]
-encode_t: True
-encode_t_dim: 100
-encode_c: True
-encode_c_dim: 100
+patch_shape: [5, 1, 1] # 4x5x1x1 = 20 patch dims
+hidden_dim: 360
+depth: 12
+num_heads: 6
+mlp_ratio: 4.0
 
 # Secondary models
 energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
-autoencoder: /home/aore/calo_dreamer/results/20240128_231347_d2_ae
+autoencoder: /home/aore/calo_dreamer/results/20240226_102202_d2_ae
 
 # Training
 lr: 1.e-3
 max_lr: 1.e-3
-batch_size: 2000
+batch_size: 1000
 validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.0001
+weight_decay: 1.e-3
 betas: [0.9, 0.999]
-n_epochs: 2000
-cycle_epochs: 2000
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -51,4 +45,4 @@ save_interval: 100_001
 sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
-solver_kwargs: {method: midpoint, options: {step_size: 0.02}}
+solver_kwargs: {method: rk4, options: {step_size: 0.02}}
