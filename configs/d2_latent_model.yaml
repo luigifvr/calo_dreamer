@@ -1,4 +1,4 @@
-run_name: d2_latent_test
+run_name: d2_latent_AR_LN
 dtype: float32
 
 # Data
@@ -25,6 +25,7 @@ n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
 encode_t_dim: 64
+normalization: LayerNorm
 
 # Secondary models
 energy_model: /remote/gpu02/ore/calo_dreamer/results/20240222_201728_d2_energy_model_ARtransformer_LTF
@@ -39,8 +40,8 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 500
-cycle_epochs: 500
+n_epochs: 300
+cycle_epochs: 300
 cycle_pct_start: 0.1
 save_interval: 100_001
 
