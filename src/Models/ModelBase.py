@@ -68,7 +68,7 @@ class GenerativeModel(nn.Module):
         self.eval_mode = get(self.params, 'eval_mode', 'all')
 
         self.batch_size = self.params["batch_size"]
-        self.batch_size_sample = get(self.params, "batch_size_sample", self.batch_size)
+        self.batch_size_sample = get(self.params, "batch_size_sample", 10_000)
 
         self.epoch = get(self.params, "total_epochs", 0)
         self.net = self.build_net()

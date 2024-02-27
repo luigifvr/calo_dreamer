@@ -1,9 +1,9 @@
-run_name: d2_2000_epoch_shape_model_AR_Conv
+run_name: d2_AR_200
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /remote/gpu05/palacios/calo_dreamer/results/20240117_150546_d2_energy_model_ARtransformer_1024
+energy_model: /remote/gpu02/ore/calo_dreamer/results/20240222_201728_d2_energy_model_ARtransformer_LTF
 
 # Data
 hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
@@ -13,7 +13,7 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
-shape: [1, 45, 16, 9]
+shape: [45, 1, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
@@ -30,28 +30,24 @@ transforms: {
                       -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1]
     },
     ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
-    StandardizeFromFile: {
-        mean_path: /remote/gpu05/palacios/calo_dreamer/dat/means_2_1.npy,
-        std_path: /remote/gpu05/palacios/calo_dreamer/stds_2_1.npy,
-        create: True
-    },
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
+    Reshape: {shape: [45, 1, 16, 9]}
 }
 
 # Training
 lr: 1.e-3
-#max_lr: 1.e-3
-batch_size: 1024
+max_lr: 1.e-3
+batch_size: 250
 validate_every: 10
 use_scheduler: True
-lr_scheduler: CosineAnnealing
-#weight_decay: 0.001
+lr_scheduler: one_cycle_lr
+weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 500
-cycle_epochs: 500
+n_epochs: 200
+cycle_epochs: 200
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -63,7 +59,7 @@ solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
 sample_us: False
 
 # Network
-model: "TransfusionAR"
+model: TransfusionAR
 network: ARtransformer_shape
 n_con: 46
 dim_embedding: 256
@@ -72,5 +68,4 @@ n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
 encode_t_dim: 64
-
-
+normalization: LayerNorm
