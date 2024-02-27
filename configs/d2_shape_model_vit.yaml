@@ -60,7 +60,7 @@ solver_kwargs: {method: rk4, options: {step_size: 0.02}}
 # Network
 network: ViT
 condition_dim: 46
-patch_shape: [5, 2, 3]
+patch_shape: [5, 2, 1]
 hidden_dim: 480
 depth: 6
 num_heads: 6
