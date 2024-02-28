@@ -15,6 +15,7 @@ def main():
     parser.add_argument('-d', '--model_dir', default=None,)
     parser.add_argument('-ep', '--epoch', default='')
     parser.add_argument('-g', '--generate', action='store_true', default=False)
+    parser.add_argument('--which_cuda', default=0) 
 
     args = parser.parse_args()
 
@@ -22,7 +23,7 @@ def main():
         params = yaml.load(f, Loader=yaml.FullLoader)
     use_cuda = torch.cuda.is_available() and args.use_cuda
 
-    device = 'cuda' if use_cuda else 'cpu'
+    device = f'cuda:{args.which_cuda}' if use_cuda else 'cpu'
     print('device: ', device)
 
     if args.plot:

@@ -351,7 +351,7 @@ class GenerativeModel(nn.Module):
                 self.params.get('particle_type'),
                 self.params.get('xml_filename'),
                 transform=self.transforms,
-                device='cpu',
+                device=self.device,
                 single_energy=self.single_energy
                 ).energy
             

@@ -54,7 +54,6 @@ class TransfusionAR(GenerativeModel):
 
     def batch_loss(self, input):
         """
-
         Args:
             x: input tensor, shape (n_events, dims_in)
             c: condition tensor, shape (n_events, dims_c)
@@ -70,11 +69,11 @@ class TransfusionAR(GenerativeModel):
             if self.ae.kl:
                 x = self.ae.reparameterize(x[0], x[1])
             x = self.ae.unflatten_layer_from_batch(x)
-            print(f'{x.shape=}')
+        else:
+            x = x.movedim(1,2)
 
-        # adjust shapes
+        # add phantom layer dim to condition
         c = c.unsqueeze(-1)
-        print(f'{c.shape=}')
 
         # Sample time steps
         t = torch.rand(
@@ -93,7 +92,6 @@ class TransfusionAR(GenerativeModel):
     @torch.no_grad()
     def sample_batch(self,c):
         sample = self.net(c.unsqueeze(-1), rev=True)
-        print(f'{sample.shape=}')
         if self.latent: # decode the generated sample
             sample, c = self.ae.flatten_layer_to_batch(sample, c)
             sample = self.ae.decode(sample.squeeze(), c)

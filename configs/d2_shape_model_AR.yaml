@@ -13,7 +13,7 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
-shape: [45, 1, 16, 9]
+shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
@@ -34,7 +34,7 @@ transforms: {
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [45, 1, 16, 9]}
+    Reshape: {shape: [1, 45, 16, 9]}
 }
 
 # Training
