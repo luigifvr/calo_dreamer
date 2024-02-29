@@ -21,14 +21,14 @@ transforms: {
     #Reweight: {factor: 0.9},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
-    AddFeaturesToCond: {split_index: 6480},
+    AddFeaturesToCond: {split_index: 40500},
     Reshape: {shape: [45, 50, 18]}
 }
 
 # Training
 lr: 1.e-3
 max_lr: 1.e-3
-batch_size: 500
+batch_size: 200
 validate_every: 10
 use_scheduler: True
 lr_scheduler: CosineAnnealing
@@ -56,7 +56,7 @@ condition_dim: 46
 ae_loss: 'bce'
 
 # (1,50,18) -> (6, 24, 8)
-#       900 -> 966
+#       900 -> 1200?
 ae_level_channels: [64, 6]
 ae_level_kernels: [[4,4]]
 ae_level_strides: [[2,2]]

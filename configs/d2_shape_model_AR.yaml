@@ -13,7 +13,8 @@ val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
-shape: [1, 45, 16, 9]
+eval_cut: 15.15e-3
+shape: [45, 1, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
@@ -34,12 +35,12 @@ transforms: {
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
+    Reshape: {shape: [45, 1, 16, 9]}
 }
 
 # Training
 lr: 1.e-3
-max_lr: 1.e-3
+max_lr: 5.e-4
 batch_size: 250
 validate_every: 10
 use_scheduler: True
@@ -69,3 +70,5 @@ n_decoder_layers: 4
 dim_feedforward: 512
 encode_t_dim: 64
 normalization: LayerNorm
+unet_kernel: [4, 9]
+unet_stride: [4, 9]

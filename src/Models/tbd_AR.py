@@ -69,9 +69,11 @@ class TransfusionAR(GenerativeModel):
             if self.ae.kl:
                 x = self.ae.reparameterize(x[0], x[1])
             x = self.ae.unflatten_layer_from_batch(x)
-        else:
-            x = x.movedim(1,2)
-
+        # else:
+        #     print(x.shape)
+        #     x = x.movedim(1,2)
+        #     print(x.shape)
+            
         # add phantom layer dim to condition
         c = c.unsqueeze(-1)
 

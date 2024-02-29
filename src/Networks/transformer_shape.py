@@ -14,11 +14,12 @@ class ARtransformer_shape(nn.Module):
         super().__init__()
         # Read in the network specifications from the params
         self.params = params
+        self.shape = self.params['shape'] # L,C,X,Y !!!
+        self.n_energy_layers = self.shape[0]
 
         self.dim_embedding = self.params["dim_embedding"]
-        self.dims_in = self.params["shape"][2] * self.params["shape"][3]
+        self.dims_in = self.shape[2] * self.shape[3] # X*Y
         self.dims_c = self.params["n_con"]
-        self.n_energy_layers = self.params["shape"][0]
         self.bayesian = False
 
         self.c_embed = self.params.get("c_embed", None)
@@ -105,8 +106,7 @@ class ARtransformer_shape(nn.Module):
         device = c.device
 
         net = self.subnet
-        x_0 = torch.randn((batch_size, self.params["shape"][1], self.params["shape"][2],self.params["shape"][3]), device=device, dtype=dtype)
-        #x_0 = torch.randn((batch_size, self.dims_in), device=device, dtype=dtype)
+        x_0 = torch.randn((batch_size, *self.shape[1:]), device=device, dtype=dtype)
 
         # NN wrapper to pass into ODE solver
         def net_wrapper(t, x_t):
@@ -114,7 +114,6 @@ class ARtransformer_shape(nn.Module):
             t_torch = t * torch.ones((x_t.size(0), 1), dtype=dtype, device=device)
             t_torch = self.t_embed(t_torch)
             v = net(x_t, torch.cat([t_torch.reshape(batch_size, -1), c.squeeze()], dim=-1))
-            # v = net(torch.cat([x_t, t_torch.reshape(batch_size, -1), c.squeeze()], dim=-1))
             return v
 
         # Solve ODE from t=1 to t=0
@@ -132,7 +131,7 @@ class ARtransformer_shape(nn.Module):
 
     def forward(self, c,x_t=None, t=None, x=None, rev=False):
         if not rev:
-            x = rearrange(x, "b l c x y -> b l (c x y)")
+            x = x.flatten(2) # b l c x y -> b l (c x y)
             xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
                 src=self.compute_embedding(
@@ -149,22 +148,19 @@ class ARtransformer_shape(nn.Module):
                     (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
                 ).triu(diagonal=1),
             )
-            t = rearrange(t, "b l c x y -> b l (c x y)")
             
-            # t = self.t_embed(t).repeat_interleave(self.params['shape'][1], 0)
-            t = self.t_embed(t)
-            x_t = rearrange(x_t, "b l c x y -> (b l) c x y")
+            x_t = x_t.flatten(0,1) # b l c x y -> (b l) c x y
+            t = t.flatten(2)       # b l c x y -> b l (c x y)
+            condition = torch.cat([self.t_embed(t), embedding], dim=-1)
+            pred = self.subnet(x_t, condition)
+            pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
-            pred = self.subnet(x_t, torch.cat([t, embedding], dim=-1))
-    
-            pred = rearrange(pred, "(b l) c x y -> b l c x y", l = 45)
         else:
-            #x = torch.zeros((c.shape[0], 1, self.dims_in), device=c.device, dtype=c.dtype)
-            x = torch.zeros((c.shape[0], 1, self.params['shape'][1], self.params["shape"][2],self.params["shape"][3]), device=c.device, dtype=c.dtype)
+            x = torch.zeros((c.shape[0], 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
             c_embed = self.compute_embedding(
             c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.n_energy_layers):
-                x = rearrange(x, " b l c x y -> b l (c x y)")
+                x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
                     src=c_embed,
                     tgt=self.compute_embedding(
@@ -176,19 +172,13 @@ class ARtransformer_shape(nn.Module):
                         (x.shape[1], x.shape[1]), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
-
                 x_new = self.sample_dimension(
                     embedding[:, -1:,:]
                 )
-                
-                x = rearrange(x, " b l (c x y) -> b l c x y", c=self.params["shape"][1], x=self.params["shape"][2])
-                #x_new = rearrange(x_new, "(b l) c x y -> b l c x y")
+                x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]
-            # pred = rearrange(pred, "b l c x y -> b c l x y")
-           # pred = rearrange(pred, "b (c l) (x y) -> b c l x y", c= 1)
-
 
         return pred
 
@@ -235,6 +225,9 @@ class SmallUNet(nn.Module):
             'cond_layers': 2,
             'activation': nn.SiLU(),
             'output_activation': None,
+            'unet_kernel': 3,
+            'unet_stride': 2,
+            'unet_pad': 0,
             'bayesian': False,
         }
         for k, p in defaults.items():
@@ -244,7 +237,10 @@ class SmallUNet(nn.Module):
         # level_1_chnls, level_2_chnls, bottleneck_chnl = self.level_channels
         level_1_chnls, bottleneck_chnl = self.level_channels
         self.a_block1 = Conv2DBlock(
-            in_channels=self.in_channels, out_channels=level_1_chnls, cond_dim=condition_dim, cond_layers=self.cond_layers)
+            in_channels=self.in_channels, out_channels=level_1_chnls,
+            down_kernel=self.unet_kernel, down_stride=self.unet_stride,
+            down_pad=self.unet_pad,  cond_dim=condition_dim, cond_layers=self.cond_layers
+        )
         # self.a_block2 = Conv2DBlock(
         #     in_channels=level_1_chnls, out_channels=level_2_chnls,
         #     cond_dim=condition_dim, cond_layers=self.cond_layers
@@ -261,6 +257,7 @@ class SmallUNet(nn.Module):
 
         self.s_block1 = UpConv2DBlock(
             in_channels=bottleneck_chnl, out_channels=level_1_chnls,
+            up_kernel=self.unet_kernel, up_stride=self.unet_stride, up_crop=self.unet_pad,
             num_classes=self.out_channels, cond_dim=condition_dim, cond_layers=self.cond_layers,
             last_layer=True
         )
@@ -279,8 +276,6 @@ class SmallUNet(nn.Module):
         # out = self.s_block2(out, residual_level2, condition)
         out = self.s_block1(out, residual_level1, condition)
 
-
-
         return out
 
 class Conv2DBlock(nn.Module):
@@ -295,7 +290,8 @@ class Conv2DBlock(nn.Module):
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, cond_dim=None, cond_layers=1, bottleneck=False,
+    def __init__(self, in_channels, out_channels, down_kernel=3, down_stride=2,
+                 down_pad=0, cond_dim=None, cond_layers=1, bottleneck=False,
                  ):
         super(Conv2DBlock, self).__init__()
         self.out_channels = out_channels
@@ -308,7 +304,7 @@ class Conv2DBlock(nn.Module):
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool2d(kernel_size=3, stride=2)
+            self.pooling = nn.MaxPool2d(kernel_size=down_kernel, stride=down_stride, padding=down_pad)
             # self.pooling = nn.Conv2d(in_channels=out_channels, out_channels=out_channels, kernel_size=(3,3), padding=1,
             #                          stride=(2,3))
 
@@ -361,7 +357,8 @@ class UpConv2DBlock(nn.Module):
     :return -> Tensor
     """
 
-    def __init__(self, in_channels, out_channels, last_layer=False, cond_dim=None, cond_layers=1, num_classes=None,
+    def __init__(self, in_channels, out_channels, up_kernel=3, up_stride=2,
+                 up_crop=0, last_layer=False, cond_dim=None, cond_layers=1, num_classes=None,
                  ):
         super(UpConv2DBlock, self).__init__()
         assert (last_layer == False and num_classes == None) or (
@@ -370,8 +367,8 @@ class UpConv2DBlock(nn.Module):
         # self.cond_layer = nn.Linear(cond_dim, out_channels)
         # self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
         self.cond_block = self.make_condition_block(cond_dim=cond_dim, cond_layers=cond_layers)
-        self.upconv1 = nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3,
-                                          stride=2)
+        self.upconv1 = nn.ConvTranspose2d(in_channels=in_channels, out_channels=out_channels, kernel_size=up_kernel,
+                                          stride=up_stride, padding=up_crop)
         self.act = nn.SiLU()
         self.bn1 = nn.BatchNorm2d(num_features=out_channels)
         self.bn2 = nn.BatchNorm2d(num_features=out_channels)
@@ -408,7 +405,6 @@ class UpConv2DBlock(nn.Module):
         out = self.conv1(out)
 
         if condition is not None:
-            # out = out + self.cond_block(condition).view(-1, self.out_channels, 1, 1)
             out = out + self.cond_block(condition).view(-1, self.out_channels, 1, 1)
         # out = self.act(self.bn1(out))
         # out = self.act(self.bn2(self.conv2(out)))
