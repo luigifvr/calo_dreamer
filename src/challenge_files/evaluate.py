@@ -427,6 +427,7 @@ def plot_histograms(hlf_class, reference_class, arg):
     plot_ECWidthEtas(hlf_class, reference_class, arg)
     plot_ECWidthPhis(hlf_class, reference_class, arg)
     plot_sparsity(hlf_class, reference_class, arg)
+    plot_weighted_depth(hlf_class, reference_class, arg)
     if arg.dataset[0] == '1':
         plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
 

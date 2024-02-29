@@ -38,6 +38,7 @@ class HighLevelFeatures:
         self.width_etas = {}
         self.width_phis = {}
         self.sparsity = {}
+        self.weighted_depth = {}
         self.particle = particle
         self.colors = cm.gnuplot2(np.linspace(0.2, 0.8, 3))
         if self.particle == 'photon':
@@ -75,6 +76,18 @@ class HighLevelFeatures:
         """ Computes the sparsity of the given layer"""
         return (layer_data > 0).mean(axis=1)
 
+    def _calculate_WeightedDepth(self, energy_layer, layer):
+        """ Calculate the rnrtgu weighted by the layer index"""
+        return layer*energy_layer
+
+    def CalculateWeightedDepth(self, energy_calo, edge_idx):
+        weighted_s = 0.
+        for l in self.relevantLayers:
+            data_l = energy_calo[:, self.bin_edges[l]:self.bin_edges[l+1]]
+            energy_sum = data_l[:, edge_idx:(len(data_l[0])+1):self.num_alpha[0]].sum(axis=-1)
+            weighted_s += self._calculate_WeightedDepth(energy_sum, l)
+        return weighted_s
+
     def CalculateFeatures(self, data):
         """ Computes all high-level features for the given data """
         self.E_tot = data.sum(axis=-1)
@@ -95,6 +108,9 @@ class HighLevelFeatures:
                         data[:, self.bin_edges[l]:self.bin_edges[l+1]])
                     
                 self.sparsity[l] = self._calculate_sparsity(data[:, self.bin_edges[l]:self.bin_edges[l+1]])
+
+        for n, r in enumerate(self.r_edges[0]):
+            self.weighted_depth[n] = self.CalculateWeightedDepth(data, n) 
 
     def _DrawSingleLayer(self, data, layer_nr, filename, title=None, fig=None, subplot=(1, 1, 1),
                          vmax=None, colbar='alone'):
@@ -236,6 +252,9 @@ class HighLevelFeatures:
 
     def GetSparsity(self):
         return self.sparsity
+
+    def GetWeightedDepth(self):
+        return self.weighted_depth
     
     def DrawAverageShower(self, data, filename=None, title=None):
         """ plots average of provided showers """
