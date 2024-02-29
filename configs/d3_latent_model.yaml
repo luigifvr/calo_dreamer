@@ -13,39 +13,34 @@ eval_cut: 15.15e-3
 # shape: [4, 15, 16, 16] # factor ~7
 shape: [4, 15, 24, 16] # factor 1.75
 
-# Model
+# Network
 model_type: shape
-network: UNet
+model: TBD
+network: ViT
 condition_dim: 46
-in_channels: 4 # number of AE embedding channels
-out_channels: 4 # number of AE embedding channels
-level_channels: [32, 64, 128]
-level_kernels: [[3,2,2], [3,2,2]]
-level_strides: [2, 2]
-level_pads: [0, 0]
-# break_dims: [2, 4]
-encode_t: True
-encode_t_dim: 100
-encode_c: True
-encode_c_dim: 100
+patch_shape: [3,4,4]
+hidden_dim: 480
+depth: 5
+num_heads: 8
+mlp_ratio: 4.0
 
 # Secondary models
 energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
 # autoencoder: /home/aore/calo_dreamer/results/20240128_235248_d3_ae # factor ~2.6
-autoencoder: /home/aore/calo_dreamer/results/20240205_041200_d3_ae # factor 1.75
+autoencoder: /data/projects/punim0011/aore/calo_dreamer_runs/20240205_041200_d3_ae # factor 1.75
 
 # Training
 lr: 1.e-3
-max_lr: 5.e-4
-div_factor: 100
+max_lr: 1.e-3
+div_factor: 200
 batch_size: 250
 validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.0001
 betas: [0.9, 0.999]
-n_epochs: 100
-cycle_epochs: 100
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.1
 save_interval: 100_001
 
