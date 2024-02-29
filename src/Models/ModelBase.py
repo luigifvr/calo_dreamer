@@ -491,9 +491,10 @@ class GenerativeModel(nn.Module):
             evaluate.run_from_py(samples, conditions, self.doc, self.params)
 
     def plot_saved_samples(self, name="", energy=None):
+        mode = self.params.get("eval_mode", "all")
         script_args = (
             f"-i {self.doc.basedir}/samples{name}.hdf5 "
-            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
             f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())
