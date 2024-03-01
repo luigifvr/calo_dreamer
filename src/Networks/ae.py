@@ -183,7 +183,7 @@ class AutoEncoder(nn.Module):
                     in_channels=bottle_channel, out_channels=bottle_channel,
                     kernel_size=(1,1)
                     )
-            self.conv_logvar = nn.Conv3d(
+            self.conv_logvar = nn.Conv2d(
                     in_channels=bottle_channel, out_channels=bottle_channel,
                     kernel_size=(1,1),
                     )

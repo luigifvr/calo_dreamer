@@ -60,7 +60,7 @@ class AE(GenerativeModel):
 
         #calculate loss for 1 batch
         if self.params.get('ae_kl', False):
-            rec, mu, logvar = self.forward(x)
+            rec, mu, logvar = self.forward(x, c)
         else:
             rec = self.forward(x, c)
         
@@ -108,7 +108,7 @@ class AE(GenerativeModel):
             x, c, weights = self.get_conditions_and_input(x)
             x, c_flat = self.flatten_layer_to_batch(x, c)
             if self.params.get('ae_kl', False):
-                rec, mu, logvar = self.forward(x)
+                rec, mu, logvar = self.forward(x, c_flat)
             else:
                 rec = self.net(x, c_flat)
             rec = self.unflatten_layer_from_batch(rec)
