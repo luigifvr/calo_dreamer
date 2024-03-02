@@ -10,6 +10,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib.backends.backend_pdf import PdfPages
 
 dup = lambda a: np.append(a, a[-1])
 
@@ -393,49 +394,109 @@ def plot_ECWidthPhis(hlf_class, reference_class, arg):
                 f.write('\n\n')
         plt.close()
 
-def plot_weighted_depth(hlf_class, reference_class, arg):
+def plot_weighted_depth_r(hlf_class, reference_class, arg, l=1):
     """ Plot weighted depth"""
-    for key in hlf_class.GetWeightedDepth().keys():
-        bins = np.logspace(np.log10(arg.min_energy),
-                               np.log10(reference_class.GetElayers()[key].max()),
+    filename = os.path.join(arg.output_dir,
+                'Weighted_Depth_slice_dataset_{}_groups_{}.pdf'.format(arg.dataset, l))
+    g = 0
+    func_hlf = hlf_class.GetWeightedDepthR() if l==1 else hlf_class.GetGroupedWeightedDepthR()
+    func_ref = reference_class.GetWeightedDepthR() if l==1 else reference_class.GetGroupedWeightedDepthR()
+    with PdfPages(filename) as pdf:
+        for n, key in enumerate(func_hlf.keys()):
+            if n%l == 0:
+                g += 1
+            bins = np.logspace(np.log10(arg.min_energy),
+                               np.log10(func_hlf[key].max()),
                                40)
- 
-        fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        counts, _ = np.histogram(hlf_class.GetWeightedDepth()[key], bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist((reference_class.GetWeightedDepth()[key]), bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist((hlf_class.GetWeightedDepth()[key]), bins=bins,
-                                    label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
-                                    linestyle='-')
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist((func_ref[key]), bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist((func_hlf[key]), bins=bins,
+                                        label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                        linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
-        ax[1].set_xlabel(r"Sparsity in layer {}".format(key))
-        ax[0].set_yscale('log')
-        ax[0].set_xscale('log')
-        #ax[1].set_xlim(*lim)
-        ax[0].legend(fontsize=20, loc='best')
-        fig.tight_layout()
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'Weighted_Depth_ring_{}_dataset_{}.pdf'.format(key,
-                                                                            arg.dataset))
-            plt.savefig(filename, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of Weighted depth ring {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
-                f.write('Weighted depth {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+
+            ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_xlabel(r"Weighted depth in slice {}, group {}".format(key, g))
+            ax[0].set_yscale('log')
+            ax[0].set_xscale('log')
+            #ax[1].set_xlim(*lim)
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                filename = os.path.join(arg.output_dir,
+                                        'Weighted_Depth_slice_{}_dataset_{}.pdf'.format(key,
+                                                                                arg.dataset))
+                plt.savefig(pdf, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Weighted depth slice {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
+                    f.write('Weighted depth slice {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
+
+def plot_weighted_depth_a(hlf_class, reference_class, arg, l=1):
+    """ Plot weighted depth"""
+    g = 0
+    filename = os.path.join(arg.output_dir,
+            'Weighted_Depth_ring_dataset_{}_groups_{}.pdf'.format(arg.dataset, l))
+
+    func_hlf = hlf_class.GetWeightedDepthA() if l==1 else hlf_class.GetGroupedWeightedDepthA()
+    func_ref = reference_class.GetWeightedDepthA() if l==1 else reference_class.GetGroupedWeightedDepthA()
+    with PdfPages(filename) as pdf:
+        for n, key in enumerate(func_hlf.keys()):
+            if n%l==0:
+                g += 1
+            bins = np.logspace(np.log10(arg.min_energy),
+                               np.log10(func_hlf[key].max()),
+                               40)
+            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist((func_ref[key]), bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist((func_hlf[key]), bins=bins,
+                                        label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                        linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+
+            ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_xlabel(r"Weighted depth in ring {}, group {}".format(key, g))
+            ax[0].set_yscale('log')
+            ax[0].set_xscale('log')
+            #ax[1].set_xlim(*lim)
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                filename = os.path.join(arg.output_dir,
+                                        'Weighted_Depth_ring_{}_dataset_{}.pdf'.format(key,
+                                                                                arg.dataset))
+                plt.savefig(pdf, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Weighted depth ring {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
+                    f.write('Weighted depth ring {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_sparsity(hlf_class, reference_class, arg):
     """ Plot sparsity of relevant layers"""
