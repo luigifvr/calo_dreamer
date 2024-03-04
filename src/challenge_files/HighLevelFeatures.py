@@ -119,7 +119,7 @@ class HighLevelFeatures:
         
         j=0
         for k in range(int(n_groups)):
-            for n in range((self.num_alpha[0]-1)):
+            for n in range((self.num_alpha[0])):
                 self.weighted_depth_gr[j] = self.CalculateWeightedDepthR(energy_calo, n, n_groups, k)
                 j += 1
 

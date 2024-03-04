@@ -77,6 +77,9 @@ class GenerativeModel(nn.Module):
         self.runs = get(self.params, "runs", 0)
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
         self.validate_every = get(self.params, "validate_every", 50)
+        
+        # augment data
+        self.aug_transforms = get(self.params, "augment_batch", False)
 
         # load autoencoder for latent modelling
         self.ae_dir = get(self.params, "autoencoder", None)
@@ -108,7 +111,8 @@ class GenerativeModel(nn.Module):
             device=self.device,
             shuffle=True,
             width_noise=self.params.get('width_noise', 1.e-6),
-            single_energy=self.params.get('single_energy', None)
+            single_energy=self.params.get('single_energy', None),
+            aug_transforms=self.aug_transforms
         )
 
         self.use_scheduler = get(self.params, "use_scheduler", False)
@@ -344,7 +348,7 @@ class GenerativeModel(nn.Module):
         np.random.shuffle(ret)
         return ret
 
-    def sample_n(self):
+    def sample_n(self, size=10**5):
 
         self.eval()
 
@@ -356,7 +360,7 @@ class GenerativeModel(nn.Module):
 
         Einc = torch.tensor(
             # Ayo: TODO: Handle single energy option for datasets 2 & 3
-            10**np.random.uniform(3, 6, size=10**5) 
+            10**np.random.uniform(3, 6, size=size) 
             if self.params['eval_dataset'] in ['2', '3'] else
             self.generate_Einc_ds1(energy=self.single_energy),
             dtype=torch.get_default_dtype(),
@@ -493,7 +497,7 @@ class GenerativeModel(nn.Module):
     def plot_saved_samples(self, name="", energy=None):
         script_args = (
             f"-i {self.doc.basedir}/samples{name}.hdf5 "
-            f"-r {self.params['eval_hdf5_file']} -m all --cut {self.params['eval_cut']} "
+            f"-r {self.params['eval_hdf5_file']} -m cls-high --cut {self.params['eval_cut']} "
             f"-d {self.params['eval_dataset']} --output_dir {self.doc.basedir}/final/"
         ) + (f" --energy {energy}" if energy is not None else '')
         evaluate.main(script_args.split())
