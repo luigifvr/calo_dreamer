@@ -472,9 +472,7 @@ class NormalizeByElayer(object):
                 layer_Es.append(layer_E)
                 cum_sum += layer_E
             layer_Es.append(total_E - cum_sum)
-            print(f'{layer_Es[0].shape=}')
             layer_Es = torch.vstack(layer_Es).T
-            print(f'{layer_Es.shape=}')
             
             # Normalize each layer and multiply it with its original energy
             transformed = torch.zeros_like(shower)
