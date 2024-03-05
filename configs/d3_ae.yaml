@@ -17,7 +17,7 @@ transforms: {
       ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_3.xml,
       xml_file: electron
     },
-    # ZeroMask: {cut: 1.e-4},
+    ZeroMask: {cut: 1.e-4},
     #Reweight: {factor: 0.9},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
@@ -26,9 +26,9 @@ transforms: {
 }
 
 # Training
-lr: 1.e-3
-max_lr: 1.e-3
-batch_size: 200
+lr: 5.e-4
+# max_lr: 1.e-3
+batch_size: 250
 validate_every: 10
 use_scheduler: True
 lr_scheduler: CosineAnnealing
@@ -43,7 +43,7 @@ save_interval: 100_001
 reconstruct: True
 sample_periodically: False
 sample_every: 10
-batch_size_sample: 5000
+batch_size_sample: 2000
 sample_every_n_samples: 1001
 
 # Model
@@ -53,14 +53,13 @@ network: AutoEncoder
 condition_dim: 46
 
 # AutoEncoder
-ae_loss: 'bce'
-
-# (1,50,18) -> (6, 24, 8)
-#       900 -> 1200?
-ae_level_channels: [64, 6]
-ae_level_kernels: [[4,4]]
-ae_level_strides: [[2,2]]
-ae_level_pads: [[0]]
+ae_loss: bce_kl
+ae_kl: True
+ae_kl_beta: 1.e-6
+ae_level_channels: [64, 64, 3]  # (1,50,18) -> (3, 16, 8)
+ae_level_kernels: [[5,4], 1]    #       900 -> 382
+ae_level_strides: [[3,2], 1]    #    = x2.35 reduction
+ae_level_pads: [0, 0]
 
 ae_encode_c: True
 ae_encode_c_dim: 100
