@@ -7,9 +7,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 from timm.models.vision_transformer import Attention, Mlp
-
-def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)  
+# from timm.models.vision_transformer import Mlp  
 
 class ViT(nn.Module):
     """
@@ -77,8 +75,8 @@ class ViT(nn.Module):
         # l, a, r = self.num_patches
         # patch_idcs = torch.arange(l*a*r)
         # attn_mask = nn.Parameter(
-        #     # patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r),
-        #     patch_idcs[:,None]//(a*r) <= patch_idcs[None,:]//(a*r),            
+        #     # patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # causal
+        #     patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # non-causal
         #     requires_grad=False
         # )
 
@@ -86,7 +84,8 @@ class ViT(nn.Module):
         self.blocks = nn.ModuleList([
             DiTBlock(
                 self.hidden_dim, self.num_heads, mlp_ratio=self.mlp_ratio,
-                attn_drop=self.attn_drop, proj_drop=self.proj_drop #, attn_mask=attn_mask
+                attn_drop=self.attn_drop, proj_drop=self.proj_drop,
+                # attn_mask=attn_mask
             ) for _ in range(self.depth)
         ])
 
@@ -146,14 +145,16 @@ class ViT(nn.Module):
     def get_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):    
 
         L, A, R = num_patches
-        z, alpha, r = torch.meshgrid(   
+        z, alpha, r = torch.meshgrid( # to cartesian
+        # z, y, x = torch.meshgrid( # keep circular
             torch.arange(L)/L,
-            torch.arange(A)*(2*math.pi/A),
+            torch.arange(A)*(2*math.pi/A), # to cartesian
+            # torch.arange(A)/A, # keep circular
             torch.arange(R)/R,
             indexing='ij'
         )
-        x = r*alpha.cos()
-        y = r*alpha.sin()
+        x = r*alpha.cos() # to cartesian
+        y = r*alpha.sin() # to cartesian
 
         fourier_dim = dim // 6
         omega = torch.arange(fourier_dim) / (fourier_dim - 1)
@@ -168,6 +169,8 @@ class ViT(nn.Module):
         # pe = F.pad(pe, (0, dim - (fourier_dim * 6))) # pad if feature dimension not cleanly divisible by 6
         return pe        
 
+def modulate(x, shift, scale):
+    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
 class DiTBlock(nn.Module):
     """
