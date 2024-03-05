@@ -79,6 +79,9 @@ class GenerativeModel(nn.Module):
         self.runs = get(self.params, "runs", 0)
         self.iterate_periodically = get(self.params, "iterate_periodically", False)
         self.validate_every = get(self.params, "validate_every", 50)
+        
+        # augment data
+        self.aug_transforms = get(self.params, "augment_batch", False)
 
         # load autoencoder for latent modelling
         self.ae_dir = get(self.params, "autoencoder", None)
@@ -110,7 +113,8 @@ class GenerativeModel(nn.Module):
             device=self.device,
             shuffle=True,
             width_noise=self.params.get('width_noise', 1.e-6),
-            single_energy=self.params.get('single_energy', None)
+            single_energy=self.params.get('single_energy', None),
+            aug_transforms=self.aug_transforms
         )
 
         self.use_scheduler = get(self.params, "use_scheduler", False)
@@ -297,8 +301,8 @@ class GenerativeModel(nn.Module):
         np.random.shuffle(ret)
         return ret
 
-    @torch.no_grad()
-    def sample_n(self):
+    @torch.inference_mode()
+    def sample_n(self, size=10**5):
 
         self.eval()
 
@@ -306,6 +310,7 @@ class GenerativeModel(nn.Module):
         #     self.net.map = get(self.params, "fix_mu", False)
         #     for bay_layer in self.net.bayesian_layers:
         #         bay_layer.random = None
+       
         # sample = []
 
         # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
