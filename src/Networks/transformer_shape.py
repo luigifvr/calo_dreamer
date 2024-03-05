@@ -14,7 +14,7 @@ class ARtransformer_shape(nn.Module):
         super().__init__()
         # Read in the network specifications from the params
         self.params = params
-        self.shape = self.params['shape'] # L,C,X,Y !!!
+        self.shape = self.params['shape'] # L,C,X,Y
         self.n_energy_layers = self.shape[0]
 
         self.dim_embedding = self.params["dim_embedding"]
@@ -73,29 +73,6 @@ class ARtransformer_shape(nn.Module):
             return self.positional_encoding(embedding_net(p))
 
     def build_subnet(self):
-
-        # self.intermediate_dim = self.params.get("intermediate_dim", 512)
-        # self.dropout = self.params.get("dropout", 0.0)
-        # self.activation = self.params.get("activation", "SiLU")
-        # self.layers_per_block = self.params.get("layers_per_block", 8)
-        # self.normalization = self.params.get("normalization", None)
-        #
-        # linear = nn.Linear(self.dim_embedding + self.encode_t_dim + self.dims_in, self.intermediate_dim)
-        # layers = [linear, getattr(nn, self.activation)()]
-        #
-        # for _ in range(1, self.layers_per_block - 1):
-        #     linear = nn.Linear(self.intermediate_dim, self.intermediate_dim)
-        #     layers.append(linear)
-        #     if self.normalization is not None:
-        #         layers.append(getattr(nn, self.normalization)(self.intermediate_dim))
-        #     if self.dropout is not None:
-        #         layers.append(nn.Dropout(p=self.dropout))
-        #     layers.append(getattr(nn, self.activation)())
-        #
-        # linear = nn.Linear(self.intermediate_dim, 1)
-        # layers.append(linear)
-        #
-        # return nn.Sequential(*layers)
         return SmallUNet(self.params, condition_dim=(self.encode_t_dim+self.dim_embedding))
 
     def sample_dimension(
