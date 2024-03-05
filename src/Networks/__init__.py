@@ -1,4 +1,7 @@
-from .resnet import Resnet
-from .unet import UNet, CylindricalUNet
+from .ae import AutoEncoder
+from .cfm_transformer import CFMTransformer
+from .resnet import Resnet, Conditional_Resnet
 from .transformer import ARtransformer
+from .transformer_shape import ARtransformer_shape
+from .unet import UNet, CylindricalUNet
 from .vit import ViT

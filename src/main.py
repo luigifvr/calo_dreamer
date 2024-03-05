@@ -14,6 +14,7 @@ def main():
     parser.add_argument('-d', '--model_dir', default=None,)
     parser.add_argument('-ep', '--epoch', default='')
     parser.add_argument('-g', '--generate', action='store_true', default=False)
+    parser.add_argument('--which_cuda', default=0) 
 
     args = parser.parse_args()
 
@@ -21,7 +22,7 @@ def main():
         params = yaml.load(f, Loader=yaml.FullLoader)
     use_cuda = torch.cuda.is_available() and args.use_cuda
 
-    device = 'cuda' if use_cuda else 'cpu'
+    device = f'cuda:{args.which_cuda}' if use_cuda else 'cpu'
     print('device: ', device)
 
     if args.plot:
@@ -42,8 +43,6 @@ def main():
     elif dtype=='float32':
         torch.set_default_dtype(torch.float32)
 
-    print(torch.get_default_dtype())
-
     model = params.get("model", "TBD")
     try:
         model = getattr(Models, model)(params, device, doc)
@@ -55,7 +54,10 @@ def main():
     else:
         if args.generate:
             model.load(args.epoch)
-            x, c = model.sample_n()
+            if params.get("reconstruct", False):
+                x, c = model.reconstruct_n()
+            else:
+                x, c = model.sample_n()
             model.plot_samples(x, c, name=f"{args.epoch}")
         else:
             model.plot_saved_samples(name=f"{args.epoch}")

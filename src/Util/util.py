@@ -1,6 +1,7 @@
 import torch
 import torch.optim
 import torch.utils.data
+import torch.nn.functional as F
 import yaml
 import math
 import numpy as np
@@ -182,3 +183,33 @@ def set_scheduler(optimizer, params, steps_per_epoch=1):
         raise ValueError(f"scheduler f\"{lr_sched_mode}\" not recognised.")
 
     return scheduler
+def sumlogC( x , eps = 5e-3):
+    '''
+    Numerically stable implementation of
+    sum of logarithm of Continous Bernoulli
+    constant C, using Taylor 2nd degree approximation
+
+    Parameter
+    ----------
+    x : Tensor of dimensions (batch_size, dim)
+        x takes values in (0,1)
+    '''
+    x = torch.clamp(x, eps, 1.-eps)
+    mask = torch.abs(x - 0.5).ge(eps)
+    far = torch.masked_select(x, mask)
+    close = torch.masked_select(x, ~mask)
+    #far_values =  torch.log( (torch.log(1. - far) - torch.log(far)).div(1. - 2. * far) )
+    far_values = torch.log( 2*torch.atanh(1-2*far)/(1-2*far) )
+    #close_values = torch.log(torch.tensor((2.))) + torch.log(1. + torch.pow( 1. - 2. * close, 2)/3. )
+    close_values = math.log(2.0) + (4.0 / 3.0 + 104.0 / 45.0 * x) * x 
+    return far_values.sum() + close_values.sum()
+
+def loss_cbvae(recon_x, x): # mu, logvar):
+    '''
+    Loss function for continuous bernoulli vae
+    '''
+    BCE = F.binary_cross_entropy(recon_x, x, reduction='sum')
+    #KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+    LOGC = -sumlogC(recon_x)
+    #return BCE + KLD + LOGC
+    return BCE + LOGC

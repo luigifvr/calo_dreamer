@@ -6,6 +6,7 @@ from Util.util import get
 from Models.ModelBase import GenerativeModel
 import Networks
 import Models
+from einops import rearrange
 
 import math
 from typing import Type, Callable, Union, Optional
@@ -53,7 +54,6 @@ class TransfusionAR(GenerativeModel):
 
     def batch_loss(self, input):
         """
-
         Args:
             x: input tensor, shape (n_events, dims_in)
             c: condition tensor, shape (n_events, dims_c)
@@ -64,14 +64,27 @@ class TransfusionAR(GenerativeModel):
         """
         x, c, _ = self.get_condition_and_input(input)
 
-        # Sample noise variables
-        x_0 = torch.randn_like(x)
+        if self.latent: # encode x into autoencoder latent space
+            x = self.ae.encode(x, c)
+            if self.ae.kl:
+                x = self.ae.reparameterize(x[0], x[1])
+            x = self.ae.unflatten_layer_from_batch(x)
+        # else:
+        #     print(x.shape)
+        #     x = x.movedim(1,2)
+        #     print(x.shape)
+            
+        # add phantom layer dim to condition
+        c = c.unsqueeze(-1)
+
         # Sample time steps
-        #t = torch.rand((x.size(0), x.size(1)), dtype=x.dtype, device=x.device)
-        t = self.distribution.sample([x.shape[0]] + [1] * (x.dim() - 1)).to(x.device)
+        t = torch.rand(
+            list(x.shape[:2]) + [1]*(x.ndim-2), dtype=x.dtype, device=x.device
+        )
+        # Sample noise variables
+        x_0 = torch.randn(x.shape, dtype=x.dtype, device=x.device)
         # Calculate point and derivative on trajectory
         x_t, x_t_dot = self.trajectory(x_0, x, t)
-
         v_pred = self.net(c,x_t,t,x)
         # Mask out masses if not needed
         loss = ((v_pred - x_t_dot) ** 2).mean()
@@ -80,7 +93,11 @@ class TransfusionAR(GenerativeModel):
 
     @torch.no_grad()
     def sample_batch(self,c):
-        return self.net(c, rev=True)
+        sample = self.net(c.unsqueeze(-1), rev=True)
+        if self.latent: # decode the generated sample
+            sample, c = self.ae.flatten_layer_to_batch(sample, c)
+            sample = self.ae.decode(sample.squeeze(), c)
+        return sample
 
 def linear_trajectory(x_0, x_1, t):
     x_t = (1 - t) * x_0 + t * x_1

@@ -10,6 +10,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from matplotlib.backends.backend_pdf import PdfPages
 
 dup = lambda a: np.append(a, a[-1])
 
@@ -137,303 +138,407 @@ def plot_Etot_Einc(hlf_class, reference_class, arg):
 
 def plot_E_layers(hlf_class, reference_class, arg):
     """ plots energy deposited in each layer """
-    for key in hlf_class.GetElayers().keys():
-        fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        if arg.x_scale == 'log':
-            bins = np.logspace(np.log10(arg.min_energy),
-                               np.log10(reference_class.GetElayers()[key].max()),
-                               40)
-        else:
-            bins = 40
-
-        counts, _ = np.histogram(hlf_class.GetElayers()[key], bins=bins, density=False)
-        counts_ref, bins, _ = ax[0].hist(reference_class.GetElayers()[key], bins=bins,
-                                       label='reference', linestyle='--', density=True, histtype='step',
-                                       alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist(hlf_class.GetElayers()[key], label='generated', bins=bins,
-                histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
-
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
-    
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
-
-        ax[1].set_ylim(0.5, 1.5)
-
-        ax[0].set_title("Energy deposited in layer {}".format(key))
-        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-        ax[1].set_xlabel(r'$E$ [MeV]')
-        ax[0].set_yscale('log'), ax[0].set_xscale('log')
-        ax[1].set_xscale('log')
-        ax[0].legend(fontsize=20, loc='best')
-        fig.tight_layout()
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir, 'E_layer_{}_dataset_{}.pdf'.format(
-                key,
+    filename = os.path.join(arg.output_dir, 'E_layer_dataset_{}.pdf'.format(
                 arg.dataset))
-            plt.savefig(filename, dpi=300, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of E layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
-                      'a') as f:
-                f.write('E layer {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetElayers().keys():
+            fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            if arg.x_scale == 'log':
+                bins = np.logspace(np.log10(arg.min_energy),
+                                   np.log10(reference_class.GetElayers()[key].max()),
+                                   40)
+            else:
+                bins = 40
+
+            counts, _ = np.histogram(hlf_class.GetElayers()[key], bins=bins, density=False)
+            counts_ref, bins, _ = ax[0].hist(reference_class.GetElayers()[key], bins=bins,
+                                           label='reference', linestyle='--', density=True, histtype='step',
+                                           alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist(hlf_class.GetElayers()[key], label='generated', bins=bins,
+                    histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
+
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+        
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+
+            ax[1].set_ylim(0.5, 1.5)
+
+            ax[0].set_title("Energy deposited in layer {}".format(key))
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
+            ax[1].set_xlabel(r'$E$ [MeV]')
+            ax[0].set_yscale('log'), ax[0].set_xscale('log')
+            ax[1].set_xscale('log')
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                plt.savefig(pdf, dpi=300, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of E layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
+                          'a') as f:
+                    f.write('E layer {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_ECEtas(hlf_class, reference_class, arg):
     """ plots center of energy in eta """
-    for key in hlf_class.GetECEtas().keys():
-        if arg.dataset in ['2', '3']:
-            lim = (-30., 30.)
-        elif key in [12, 13]:
-            lim = (-500., 500.)
-        else:
-            lim = (-100., 100.)
-        fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        bins = np.linspace(*lim, 51)
+    filename = os.path.join(arg.output_dir,
+                'ECEta_layer_dataset_{}.pdf'.format(arg.dataset))
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetECEtas().keys():
+            if arg.dataset in ['2', '3']:
+                lim = (-30., 30.)
+            elif key in [12, 13]:
+                lim = (-500., 500.)
+            else:
+                lim = (-100., 100.)
+            fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            bins = np.linspace(*lim, 51)
 
-        counts, _ = np.histogram(hlf_class.GetECEtas()[key], bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist(reference_class.GetECEtas()[key], bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist(hlf_class.GetECEtas()[key], label='generated', bins=bins,
-                                     histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
-                                     linestyle='-')
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+            counts, _ = np.histogram(hlf_class.GetECEtas()[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist(reference_class.GetECEtas()[key], bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist(hlf_class.GetECEtas()[key], label='generated', bins=bins,
+                                         histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                         linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins, dup(ratio), linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins, dup(ratio), linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_ylim(0.5, 1.5)
 
 
-        ax[0].set_title(r"Center of Energy in $\Delta\eta$ in layer {}".format(key))
-        ax[1].set_xlabel(r'[mm]')
-        ax[0].set_xlim(*lim)
-        ax[0].set_yscale('log')
-        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-        ax[0].legend(fontsize=20)
-        fig.tight_layout()
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'ECEta_layer_{}_dataset_{}.pdf'.format(key,
-                                                                           arg.dataset))
-            plt.savefig(filename, dpi=300, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of EC Eta layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
-                      'a') as f:
-                f.write('EC Eta layer {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ax[0].set_title(r"Center of Energy in $\Delta\eta$ in layer {}".format(key))
+            ax[1].set_xlabel(r'[mm]')
+            ax[0].set_xlim(*lim)
+            ax[0].set_yscale('log')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
+            ax[0].legend(fontsize=20)
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                filename = os.path.join(arg.output_dir,
+                                        'ECEta_layer_{}_dataset_{}.pdf'.format(key,
+                                                                               arg.dataset))
+                plt.savefig(pdf, dpi=300, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of EC Eta layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
+                          'a') as f:
+                    f.write('EC Eta layer {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_ECPhis(hlf_class, reference_class, arg):
     """ plots center of energy in phi """
-    for key in hlf_class.GetECPhis().keys():
-        if arg.dataset in ['2', '3']:
-            lim = (-30., 30.)
-        elif key in [12, 13]:
-            lim = (-500., 500.)
-        else:
-            lim = (-100., 100.)
-        fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        bins = np.linspace(*lim, 51)
+    filename = os.path.join(arg.output_dir,
+                'ECPhi_layer_dataset_{}.pdf'.format(arg.dataset))
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetECPhis().keys():
+            if arg.dataset in ['2', '3']:
+                lim = (-30., 30.)
+            elif key in [12, 13]:
+                lim = (-500., 500.)
+            else:
+                lim = (-100., 100.)
+            fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            bins = np.linspace(*lim, 51)
 
-        counts, _ = np.histogram(hlf_class.GetECPhis()[key], bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist(reference_class.GetECPhis()[key], bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist(hlf_class.GetECPhis()[key], label='generated', bins=bins,
-                    histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
+            counts, _ = np.histogram(hlf_class.GetECPhis()[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist(reference_class.GetECPhis()[key], bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist(hlf_class.GetECPhis()[key], label='generated', bins=bins,
+                        histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
 
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_ylim(0.5, 1.5)
 
 
-        ax[0].set_title(r"Center of Energy in $\Delta\phi$ in layer {}".format(key))
-        ax[1].set_xlabel(r'[mm]')
-        ax[0].set_xlim(*lim)
-        ax[0].set_yscale('log')
-        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-        ax[0].legend(fontsize=20)
-        fig.tight_layout()
-    
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'ECPhi_layer_{}_dataset_{}.pdf'.format(key,
-                                                                           arg.dataset))
-            plt.savefig(filename, dpi=300, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of EC Phi layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
-                      'a') as f:
-                f.write('EC Phi layer {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ax[0].set_title(r"Center of Energy in $\Delta\phi$ in layer {}".format(key))
+            ax[1].set_xlabel(r'[mm]')
+            ax[0].set_xlim(*lim)
+            ax[0].set_yscale('log')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
+            ax[0].legend(fontsize=20)
+            fig.tight_layout()
+        
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                filename = os.path.join(arg.output_dir,
+                                        'ECPhi_layer_{}_dataset_{}.pdf'.format(key,
+                                                                               arg.dataset))
+                plt.savefig(pdf, dpi=300, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of EC Phi layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
+                          'a') as f:
+                    f.write('EC Phi layer {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_ECWidthEtas(hlf_class, reference_class, arg):
     """ plots width of center of energy in eta """
-    for key in hlf_class.GetWidthEtas().keys():
-        if arg.dataset in ['2', '3']:
-            lim = (0., 30.)
-        elif key in [12, 13]:
-            lim = (0., 400.)
-        else:
-            lim = (0., 100.)
-        fig, ax = plt.subplots(2,1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        bins = np.linspace(*lim, 51)
+    filename = os.path.join(arg.output_dir,
+                'WidthEta_layer_dataset_{}.pdf'.format(arg.dataset))
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetWidthEtas().keys():
+            if arg.dataset in ['2', '3']:
+                lim = (0., 30.)
+            elif key in [12, 13]:
+                lim = (0., 400.)
+            else:
+                lim = (0., 100.)
+            fig, ax = plt.subplots(2,1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            bins = np.linspace(*lim, 51)
 
-        counts, _ = np.histogram(hlf_class.GetWidthEtas()[key], bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist(reference_class.GetWidthEtas()[key], bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist(hlf_class.GetWidthEtas()[key], label='generated', bins=bins,
-                                     histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
-                                     linestyle='-')
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+            counts, _ = np.histogram(hlf_class.GetWidthEtas()[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist(reference_class.GetWidthEtas()[key], bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist(hlf_class.GetWidthEtas()[key], label='generated', bins=bins,
+                                         histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                         linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_ylim(0.5, 1.5)
 
-        ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
-        ax[1].set_xlabel(r'[mm]')
-        ax[0].set_xlim(*lim)
-        ax[0].set_yscale('log')
-        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-        ax[0].legend(fontsize=20)
-        fig.tight_layout()
- 
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'WidthEta_layer_{}_dataset_{}.pdf'.format(key,
-                                                                              arg.dataset))
-            plt.savefig(filename, dpi=300, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of Width Eta layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
-                      'a') as f:
-                f.write('Width Eta layer {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
+            ax[1].set_xlabel(r'[mm]')
+            ax[0].set_xlim(*lim)
+            ax[0].set_yscale('log')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
+            ax[0].legend(fontsize=20)
+            fig.tight_layout()
+     
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                filename = os.path.join(arg.output_dir,
+                                        'WidthEta_layer_{}_dataset_{}.pdf'.format(key,
+                                                                                  arg.dataset))
+                plt.savefig(pdf, dpi=300, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Width Eta layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
+                          'a') as f:
+                    f.write('Width Eta layer {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_ECWidthPhis(hlf_class, reference_class, arg):
     """ plots width of center of energy in phi """
-    for key in hlf_class.GetWidthPhis().keys():
-        if arg.dataset in ['2', '3']:
-            lim = (0., 30.)
-        elif key in [12, 13]:
-            lim = (0., 400.)
-        else:
-            lim = (0., 100.)
-        fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        bins = np.linspace(*lim, 51)
-        counts, _ = np.histogram(hlf_class.GetWidthPhis()[key], bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist(reference_class.GetWidthPhis()[key], bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist(hlf_class.GetWidthPhis()[key], label='generated', bins=bins,
-                histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
+    filename = os.path.join(arg.output_dir,
+                    'WidthPhi_layer_dataset_{}.pdf'.format(arg.dataset))
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetWidthPhis().keys():
+            if arg.dataset in ['2', '3']:
+                lim = (0., 30.)
+            elif key in [12, 13]:
+                lim = (0., 400.)
+            else:
+                lim = (0., 100.)
+            fig, ax = plt.subplots(2, 1, figsize=(6, 6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            bins = np.linspace(*lim, 51)
+            counts, _ = np.histogram(hlf_class.GetWidthPhis()[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist(reference_class.GetWidthPhis()[key], bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist(hlf_class.GetWidthPhis()[key], label='generated', bins=bins,
+                    histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color, linestyle='-')
 
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_ylim(0.5, 1.5)
 
-        ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
-        ax[1].set_xlabel(r'[mm]')
-        ax[0].set_xlim(*lim)
-        ax[0].set_yscale('log')
-        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-        ax[0].legend(fontsize=20)
-        fig.tight_layout()
- 
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'WidthPhi_layer_{}_dataset_{}.pdf'.format(key,
-                                                                              arg.dataset))
-            plt.savefig(filename, dpi=300, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of Width Phi layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
-                      'a') as f:
-                f.write('Width Phi layer {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
+            ax[1].set_xlabel(r'[mm]')
+            ax[0].set_xlim(*lim)
+            ax[0].set_yscale('log')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
+            ax[0].legend(fontsize=20)
+            fig.tight_layout()
+     
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                plt.savefig(pdf, dpi=300, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Width Phi layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)),
+                          'a') as f:
+                    f.write('Width Phi layer {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
+
+def plot_weighted_depth_r(hlf_class, reference_class, arg, l=1):
+    """ Plot weighted depth"""
+    filename = os.path.join(arg.output_dir,
+                'Weighted_Depth_slice_dataset_{}_groups_{}.pdf'.format(arg.dataset, l))
+    g = 0
+    func_hlf = hlf_class.GetWeightedDepthR() if l==1 else hlf_class.GetGroupedWeightedDepthR()
+    func_ref = reference_class.GetWeightedDepthR() if l==1 else reference_class.GetGroupedWeightedDepthR()
+    with PdfPages(filename) as pdf:
+        for n, key in enumerate(func_hlf.keys()):
+            bins = np.linspace(g*len(hlf_class.relevantLayers)/l,
+                               (g+1)*len(hlf_class.relevantLayers)/l, 40)
+            if (n+1)%(hlf_class.num_alpha[0]) == 0:
+                g += 1
+            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist((func_ref[key]), bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist((func_hlf[key]), bins=bins,
+                                        label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                        linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+
+            ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_xlabel(r"Weighted depth in slice {}, group {}".format(key, g))
+            ax[0].set_yscale('log')
+            #ax[0].set_xscale('log')
+            #ax[1].set_xlim(*lim)
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                plt.savefig(pdf, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Weighted depth slice {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
+                    f.write('Weighted depth slice {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
+
+def plot_weighted_depth_a(hlf_class, reference_class, arg, l=1):
+    """ Plot weighted depth"""
+    g = 0
+    filename = os.path.join(arg.output_dir,
+            'Weighted_Depth_ring_dataset_{}_groups_{}.pdf'.format(arg.dataset, l))
+
+    func_hlf = hlf_class.GetWeightedDepthA() if l==1 else hlf_class.GetGroupedWeightedDepthA()
+    func_ref = reference_class.GetWeightedDepthA() if l==1 else reference_class.GetGroupedWeightedDepthA()
+    with PdfPages(filename) as pdf:
+        for n, key in enumerate(func_hlf.keys()):
+            bins = np.linspace(g*len(hlf_class.relevantLayers)/l,
+                               (g+1)*len(hlf_class.relevantLayers)/l, 40)
+            if (n+1)%(len(hlf_class.r_edges[0])-1)==0:
+                g += 1
+            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist((func_ref[key]), bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist((func_hlf[key]), bins=bins,
+                                        label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                        linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+
+            ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_xlabel(r"Weighted depth in ring {}, group {}".format(key, g))
+            ax[0].set_yscale('log')
+            #ax[0].set_xscale('log')
+            #ax[1].set_xlim(*lim)
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                plt.savefig(pdf, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Weighted depth ring {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
+                    f.write('Weighted depth ring {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_sparsity(hlf_class, reference_class, arg):
     """ Plot sparsity of relevant layers"""
-    for key in hlf_class.GetSparsity().keys():
-        lim = (0, 1)
-        fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
-        bins = np.linspace(*lim, 20)
+    filename = os.path.join(arg.output_dir,
+                'Sparsity_layer_dataset_{}.pdf'.format(arg.dataset))
+    with PdfPages(filename) as pdf:
+        for key in hlf_class.GetSparsity().keys():
+            lim = (0, 1)
+            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            bins = np.linspace(*lim, 20)
 
-        counts, _ = np.histogram((1-hlf_class.GetSparsity()[key]), bins=bins, density=False)
-        counts_ref, _, _ = ax[0].hist((1-reference_class.GetSparsity()[key]), bins=bins,
-                                    label='reference', linestyle='--', density=True, histtype='step',
-                                    alpha=1., linewidth=1.5, color=hlf_class.color)
-        counts_data, _, _ = ax[0].hist((1-hlf_class.GetSparsity()[key]), bins=bins,
-                                    label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
-                                    linestyle='-')
-        y_ref_err = counts_data/np.sqrt(counts)
-        ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
+            counts, _ = np.histogram((1-hlf_class.GetSparsity()[key]), bins=bins, density=False)
+            counts_ref, _, _ = ax[0].hist((1-reference_class.GetSparsity()[key]), bins=bins,
+                                        label='reference', linestyle='--', density=True, histtype='step',
+                                        alpha=1., linewidth=1.5, color=hlf_class.color)
+            counts_data, _, _ = ax[0].hist((1-hlf_class.GetSparsity()[key]), bins=bins,
+                                        label='generated', histtype='step', linewidth=1.5, alpha=1., density=True, color=reference_class.color,
+                                        linestyle='-')
+            y_ref_err = counts_data/np.sqrt(counts)
+            ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=reference_class.color, alpha=0.2)
 
-        ratio = counts_data / counts_ref
-        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
-        ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
+            ratio = counts_data / counts_ref
+            ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.5, alpha=1., linestyle='--', color=hlf_class.color)
+            ax[1].step(bins[:-1], ratio, linewidth=1.5, alpha=1.0, color=hlf_class.color, where='post')
+            ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=hlf_class.color, alpha=0.2)
 
-        ax[1].set_ylim(0.5, 1.5)
-        ax[1].set_xlabel(r"Sparsity in layer {}".format(key))
-        #plt.yscale('log')
-        ax[1].set_xlim(*lim)
-        ax[0].legend(fontsize=20, loc='best')
-        fig.tight_layout()
-        if arg.mode in ['all', 'hist-p', 'hist']:
-            filename = os.path.join(arg.output_dir,
-                                    'Sparsity_layer_{}_dataset_{}.pdf'.format(key,
-                                                                            arg.dataset))
-            plt.savefig(filename, format='pdf')
-        if arg.mode in ['all', 'hist-chi', 'hist']:
-            seps = _separation_power(counts_ref, counts_data, bins)
-            print("Separation power of Sparsity layer {} histogram: {}".format(key, seps))
-            with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
-                f.write('Sparsity {}: \n'.format(key))
-                f.write(str(seps))
-                f.write('\n\n')
-        plt.close()
+            ax[1].set_ylim(0.5, 1.5)
+            ax[1].set_xlabel(r"Sparsity in layer {}".format(key))
+            #plt.yscale('log')
+            ax[1].set_xlim(*lim)
+            ax[0].legend(fontsize=20, loc='best')
+            fig.tight_layout()
+            if arg.mode in ['all', 'hist-p', 'hist']:
+                plt.savefig(pdf, format='pdf')
+            if arg.mode in ['all', 'hist-chi', 'hist']:
+                seps = _separation_power(counts_ref, counts_data, bins)
+                print("Separation power of Sparsity layer {} histogram: {}".format(key, seps))
+                with open(os.path.join(arg.output_dir, 'histogram_chi2_{}.txt'.format(arg.dataset)), 'a') as f:
+                    f.write('Sparsity {}: \n'.format(key))
+                    f.write(str(seps))
+                    f.write('\n\n')
+            plt.close()
 
 def plot_cell_dist(shower_arr, ref_shower_arr, arg):
     """ plots voxel energies across all layers """

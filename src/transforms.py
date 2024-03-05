@@ -4,7 +4,7 @@ import os
 
 from challenge_files import *
 from challenge_files import XMLHandler
-from more_itertools import pairwise
+from itertools import pairwise
 
 def logit_trafo(array, alpha=1.e-6, inv=False):
     if inv:
@@ -307,6 +307,48 @@ class SelectiveUniformNoise(object):
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy        
 
+class SetToVal(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, val=0.):
+        self.val = val
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        else:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        return transformed, energy        
+
+class ZeroMask2(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, cut=0.):
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        return transformed, energy        
+
 class ZeroMask(object):
     """
     Masks voxels to zero in the reverse transformation
@@ -374,7 +416,22 @@ class Reshape(object):
         else:
             shower = shower.reshape(-1, *self.shape)
         return shower, energy
-    
+ 
+class Reweight(object):
+    """
+    Reweight voxels
+    """
+
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            shower = shower**(1/self.factor)
+        else:
+            shower = shower**(self.factor)
+        return shower, energy
+
 class NormalizeByElayer(object):
     """
     Normalize each shower by the layer energy
@@ -442,7 +499,6 @@ class NormalizeByElayer(object):
             transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
-
 class AddCoordChannels(object):
     """
     Add channel to image containing the coordinate value along particular

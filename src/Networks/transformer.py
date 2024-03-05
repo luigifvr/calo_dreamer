@@ -59,7 +59,6 @@ class ARtransformer(nn.Module):
         Appends the one-hot encoded position to the momenta p. Then this is either zero-padded
         or an embedding net is used to compute the embedding of the correct dimension.
         """
-        p = p.unsqueeze(-1)
         one_hot = torch.eye(dim, device=p.device, dtype=p.dtype)[
             None, : p.shape[1], :
         ].expand(p.shape[0], -1, -1)
@@ -124,12 +123,11 @@ class ARtransformer(nn.Module):
         # Extract generated samples and mask out masses if not needed
         x_1 = x_t[-1]
 
-        return x_1
+        return x_1.unsqueeze(1)
 
-    def forward(self, c,x_t=None, t=None, x=None, rev=False):
+    def forward(self, c, x_t=None, t=None, x=None, rev=False):
         if not rev:
-            #x = x.unsqueeze(-1)7
-            xp = nn.functional.pad(x[:, :-1], (1, 0, 0, 0))
+            xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
                 src=self.compute_embedding(
                     c,
@@ -145,10 +143,11 @@ class ARtransformer(nn.Module):
                     (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
                 ).triu(diagonal=1),
             )
+
             t = self.t_embed(t)
-            pred = self.subnet(torch.cat([x_t.unsqueeze(-1), t.unsqueeze(1).repeat(1,45,1), embedding], dim=-1)).squeeze()
+            pred = self.subnet(torch.cat([x_t, t, embedding], dim=-1))
         else:
-            x = torch.zeros((c.shape[0], 1), device=c.device, dtype=c.dtype)
+            x = torch.zeros((c.shape[0], 1, 1), device=c.device, dtype=c.dtype)
             c_embed = self.compute_embedding(
             c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.dims_in):
@@ -164,12 +163,13 @@ class ARtransformer(nn.Module):
                     ).triu(diagonal=1),
                 )
                 x_new = self.sample_dimension(
-                    embedding[:, -1:]
+                    embedding[:, -1:, :]
                 )
 
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]
+            pred = pred.squeeze()
 
 
         return pred
@@ -186,7 +186,7 @@ class GaussianFourierProjection(nn.Module):
 
     def forward(self, x):
         x_proj = x * self.W * 2 * torch.pi
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=1)
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
 
 class PositionalEncoding(nn.Module):
 

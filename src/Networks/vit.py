@@ -7,9 +7,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 from timm.models.vision_transformer import Attention, Mlp
-
-def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)  
+# from timm.models.vision_transformer import Mlp  
 
 class ViT(nn.Module):
     """
@@ -24,12 +22,14 @@ class ViT(nn.Module):
 
         defaults = {
             'shape': (1, 45, 16, 9),
-            'patch_shape': (3, 2, 1),
+            'patch_shape': (3, 2, 3),
             'condition_dim': 46,
             'hidden_dim': 24 * 24,
             'depth': 4,
             'num_heads': 4,
             'mlp_ratio': 4.0,
+            'attn_drop': 0.,
+            'proj_drop': 0.,
         }
 
         for k, p in defaults.items():
@@ -44,15 +44,13 @@ class ViT(nn.Module):
             f"Input radial bin count ({R}) should be divisible by patch size ({self.patch_shape[2]})."
         assert not self.hidden_dim % 6, "Hidden dim should be divisible by 6 (for fourier position embeddings)"
         
-        self.in_channels = C
-        self.out_channels = C
         self.patch_shape = list(self.patch_shape)
         self.num_patches = [
             s // p for s, p in zip(self.shape[1:], self.patch_shape)
         ]
 
         # initialize x,t,c embeddings
-        patch_dim = math.prod(self.patch_shape) * self.out_channels
+        patch_dim = math.prod(self.patch_shape) * C
         self.x_embedder = nn.Sequential(
             Rearrange(
                 'b c (l p1) (a p2) (r p3) -> b (l a r) (p1 p2 p3 c)',
@@ -73,16 +71,27 @@ class ViT(nn.Module):
             requires_grad=False
         )
 
+        # # compute layer-causal attention mask
+        # l, a, r = self.num_patches
+        # patch_idcs = torch.arange(l*a*r)
+        # attn_mask = nn.Parameter(
+        #     # patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # causal
+        #     patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # non-causal
+        #     requires_grad=False
+        # )
+
         # initialize transformer stack
         self.blocks = nn.ModuleList([
             DiTBlock(
-                self.hidden_dim, self.num_heads, mlp_ratio=self.mlp_ratio
+                self.hidden_dim, self.num_heads, mlp_ratio=self.mlp_ratio,
+                attn_drop=self.attn_drop, proj_drop=self.proj_drop,
+                # attn_mask=attn_mask
             ) for _ in range(self.depth)
         ])
 
         # initialize output layer
         self.final_layer = FinalLayer(
-            self.hidden_dim, self.patch_shape, self.out_channels
+            self.hidden_dim, self.patch_shape, C
         )
 
         # custom weight initialization
@@ -136,14 +145,16 @@ class ViT(nn.Module):
     def get_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):    
 
         L, A, R = num_patches
-        z, alpha, r = torch.meshgrid(
+        z, alpha, r = torch.meshgrid( # to cartesian
+        # z, y, x = torch.meshgrid( # keep circular
             torch.arange(L)/L,
-            torch.arange(A)*(2*math.pi/A),
+            torch.arange(A)*(2*math.pi/A), # to cartesian
+            # torch.arange(A)/A, # keep circular
             torch.arange(R)/R,
             indexing='ij'
         )
-        x = r*alpha.cos()
-        y = r*alpha.sin()
+        x = r*alpha.cos() # to cartesian
+        y = r*alpha.sin() # to cartesian
 
         fourier_dim = dim // 6
         omega = torch.arange(fourier_dim) / (fourier_dim - 1)
@@ -158,6 +169,8 @@ class ViT(nn.Module):
         # pe = F.pad(pe, (0, dim - (fourier_dim * 6))) # pad if feature dimension not cleanly divisible by 6
         return pe        
 
+def modulate(x, shift, scale):
+    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
 class DiTBlock(nn.Module):
     """
@@ -240,4 +253,45 @@ class TimestepEmbedder(nn.Module):
     def forward(self, t):
         t_freq = self.timestep_embedding(t, self.frequency_embedding_size)
         t_emb = self.mlp(t_freq)
-        return t_emb        
+        return t_emb
+
+# class Attention(nn.Module):
+    
+#     def __init__(
+#             self,
+#             dim: int,
+#             num_heads: int = 8,
+#             qkv_bias: bool = False,
+#             qk_norm: bool = False,
+#             attn_drop: float = 0.,
+#             proj_drop: float = 0.,
+#             attn_mask: torch.Tensor = None,
+#             norm_layer: nn.Module = nn.LayerNorm,
+#     ) -> None:
+#         super().__init__()
+#         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+#         self.num_heads = num_heads
+#         self.head_dim = dim // num_heads
+#         self.scale = self.head_dim ** -0.5
+
+#         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+#         self.q_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
+#         self.k_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
+#         self.attn_drop = nn.Dropout(attn_drop)
+#         self.proj = nn.Linear(dim, dim)
+#         self.proj_drop = nn.Dropout(proj_drop)
+#         self.attn_mask = attn_mask
+
+#     def forward(self, x: torch.Tensor) -> torch.Tensor:
+#         B, N, C = x.shape
+#         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+#         q, k, v = qkv.unbind(0)
+#         q, k = self.q_norm(q), self.k_norm(k)
+#         x = nn.functional.scaled_dot_product_attention(
+#             q, k, v, attn_mask=self.attn_mask,
+#             dropout_p=self.attn_drop.p if self.training else 0.,
+#         )
+#         x = x.transpose(1, 2).reshape(B, N, C)
+#         x = self.proj(x)
+#         x = self.proj_drop(x)
+#         return x
