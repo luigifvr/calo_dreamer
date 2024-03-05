@@ -216,15 +216,10 @@ class GenerativeModel(nn.Module):
         # generate and plot samples at the end
         if get(self.params, "sample", True):
             print("generate_samples: Start generating samples", flush=True)
-            t_0 = time.time()
             if get(self.params, "reconstruct", False):
                 samples, c = self.reconstruct_n()
             else:
                 samples, c = self.sample_n()
-            t_1 = time.time()
-            sampling_time = t_1 - t_0
-            self.params["sampling_time"] = sampling_time
-            print(f"generate_samples: Finished generating {len(samples)} samples after {sampling_time} s.", flush=True)
             self.plot_samples(samples=samples, conditions=c, energy=self.single_energy)
 
     def train_one_epoch(self):
@@ -313,6 +308,8 @@ class GenerativeModel(nn.Module):
        
         # sample = []
 
+        t_0 = time.time()
+
         # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
         Einc = torch.tensor(
             10**np.random.uniform(3, 6, size=get(self.params, "n_samples", 10**5)) 
@@ -366,6 +363,14 @@ class GenerativeModel(nn.Module):
             )
                 
         sample = torch.vstack([self.sample_batch(c).cpu() for c in transformed_cond_loader])
+
+        t_1 = time.time()
+        sampling_time = t_1 - t_0
+        self.params["sampling_time"] = sampling_time
+        print(
+            f"generate_samples: Finished generating {len(sample)} samples "
+            f"after {sampling_time} s.", flush=True
+        )
 
         return sample, transformed_cond.cpu()
     
