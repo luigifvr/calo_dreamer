@@ -91,7 +91,7 @@ class TransfusionAR(GenerativeModel):
 
         return loss
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def sample_batch(self,c):
         sample = self.net(c.unsqueeze(-1), rev=True)
         if self.latent: # decode the generated sample

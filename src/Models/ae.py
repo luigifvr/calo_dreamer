@@ -103,15 +103,15 @@ class AE(GenerativeModel):
 
         return loss
 
+    @torch.inference_mode()
     def sample_batch(self, x):
-        with torch.no_grad():
-            x, c, weights = self.get_conditions_and_input(x)
-            x, c_flat = self.flatten_layer_to_batch(x, c)
-            if self.params.get('ae_kl', False):
-                rec, mu, logvar = self.forward(x, c_flat)
-            else:
-                rec = self.net(x, c_flat)
-            rec = self.unflatten_layer_from_batch(rec)
+        x, c, weights = self.get_conditions_and_input(x)
+        x, c_flat = self.flatten_layer_to_batch(x, c)
+        if self.params.get('ae_kl', False):
+            rec, mu, logvar = self.forward(x, c_flat)
+        else:
+            rec = self.net(x, c_flat)
+        rec = self.unflatten_layer_from_batch(rec)
         return rec.detach().cpu(), c.detach().cpu()
 
     def plot_samples(self, samples, conditions, name="", energy=None, mode='all'): #TODO
@@ -127,20 +127,20 @@ class AE(GenerativeModel):
         self.save_sample(samples, conditions, name="_ae_reco")
         evaluate.run_from_py(samples, conditions, self.doc, self.params)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def encode(self, x, c):
         x, c = self.flatten_layer_to_batch(x, c)
         c = self.net.c_encoding(c)
         enc = self.net.encode(x,c)
         return enc
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def decode(self, x, c):
         c = self.net.c_encoding(c)
         x = self.net.decode(x, c)
         return self.unflatten_layer_from_batch(x)
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def reparameterize(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
         esp = torch.randn(*mu.size()).to(mu.device)

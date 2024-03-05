@@ -94,7 +94,7 @@ def benchmark(args, doc, device):
         samples, conds, nfes = [], [], []
         for Einc in Eincs:
 
-            with torch.no_grad():
+            with torch.inference_mode():
 
                 # first sample layer energies
                 u_sample = models['energy'].sample_batch(Einc)

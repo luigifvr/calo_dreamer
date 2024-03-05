@@ -86,6 +86,7 @@ class TBD(GenerativeModel):
 
         return loss
 
+    @torch.inference_mode()
     def sample_batch(self, batch):
         """
         Generate n_samples new samples.
@@ -100,19 +101,18 @@ class TBD(GenerativeModel):
             t_torch = t.repeat((x_t.shape[0],1)).to(self.device)
             return self.net(x_t, t_torch, batch)
 
-        with torch.no_grad():
-            solver = sdeint if self.params.get("use_sde", False) else odeint
-            function = SDE(self.net) if self.params.get("use_sde", False) else f
+        solver = sdeint if self.params.get("use_sde", False) else odeint
+        function = SDE(self.net) if self.params.get("use_sde", False) else f
 
-            sample = solver(
-                function, x_T,
-                torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
-                **self.params.get("solver_kwargs", {})
-            )[-1]
+        sample = solver(
+            function, x_T,
+            torch.tensor([self.t_min, self.t_max], dtype=dtype, device=device),
+            **self.params.get("solver_kwargs", {})
+        )[-1]
 
-            if self.latent:
-                # decode the generated sample
-                sample = self.ae.decode(sample, batch)
+        if self.latent:
+            # decode the generated sample
+            sample = self.ae.decode(sample, batch)
             
         return sample
 
@@ -132,12 +132,12 @@ class TBD(GenerativeModel):
         def f(t, x_t):
             x_t_torch = torch.Tensor(x_t).reshape((-1, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
-            with torch.no_grad():
+            with torch.inference_mode():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
             return f_t
 
         events = []
-        with torch.no_grad():
+        with torch.inference_mode():
             for i in range(int(n_samples / batch_size)):
                 sol = solve_ivp(f, (1, 0), samples[batch_size * i: batch_size * (i + 1)].flatten())
                 s = sol.y[:, -1].reshape(batch_size, *self.shape)
@@ -158,12 +158,12 @@ class TBD(GenerativeModel):
         def f(t, x_t):
             x_t_torch = torch.Tensor(x_t).reshape((batch_size, *self.shape)).to(self.device)
             t_torch = t * torch.ones_like(x_t_torch[:, [0]])
-            with torch.no_grad():
+            with torch.inference_mode():
                 f_t = self.net(x_t_torch, t_torch).detach().cpu().numpy().flatten()
             return f_t
 
         events = []
-        with torch.no_grad():
+        with torch.inference_mode():
             for i in range(int(n_samples / batch_size) + 1):
                 sol = solve_ivp(f, (0, 1), x_T[batch_size * i: batch_size * (i + 1)].flatten(), t_eval=t_frames)
                 s = sol.y.reshape(batch_size, *self.shape, -1)
