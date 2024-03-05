@@ -1,14 +1,14 @@
-run_name: d2_2000_epoch_shape_model_utransformer_
+run_name: d2_vit_500
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /remote/gpu05/palacios/calo_dreamer/results/20240114_171330_d2_energy_model_ARtransformer_
+energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
 
 # Data
-hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
-eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
-xml_filename: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml
+hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -18,7 +18,7 @@ shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml,
+        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectiveUniformNoise: {
@@ -39,16 +39,16 @@ transforms: {
 }
 
 # Training
-lr: 5.e-3
-#max_lr: 1.e-3
-batch_size: 1024
-validate_every: 10
+lr: 1.e-3
+max_lr: 1.e-3
+batch_size: 250
+validate_every: 5
 use_scheduler: True
-lr_scheduler: CosineAnnealing
-#weight_decay: 0.001
+lr_scheduler: one_cycle_lr
+weight_decay: 1.e-3
 betas: [0.9, 0.999]
-n_epochs: 2000
-cycle_epochs: 2000
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -56,18 +56,19 @@ save_interval: 100_001
 sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
-solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
-sample_us: True
+solver_kwargs: {method: rk4, options: {step_size: 0.02}}
 
 # Network
-network: UNet
+network: ViT
 condition_dim: 46
-break_dims: [2, 4]
-level_channels: [32, 64, 128]
-level_kernels: [[3,2,3], [3,2,3]]
-level_strides: [[3,2,3], [3,2,3]]
-level_pads: [0, 0]
-encode_t: True
-encode_t_dim: 100
-encode_c: True
-encode_c_dim: 100
+patch_shape: [5, 2, 1]
+hidden_dim: 480
+depth: 6
+num_heads: 6
+mlp_ratio: 4.0
+
+# patch_shape: [3, 2, 1]
+# hidden_dim: 480
+# depth: 8
+# num_heads: 8
+# mlp_ratio: 4.0

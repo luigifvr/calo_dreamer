@@ -1,10 +1,8 @@
-from more_itertools import pairwise
+from itertools import pairwise
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-# from Networks.vblinear import VBLinear
 
 class GaussianFourierProjection(nn.Module): # TODO: Move this (and defn in resnet.py) to separate file
     """Gaussian random features for encoding time steps."""
@@ -30,6 +28,7 @@ def add_coord_channels(x, break_dims=None):
     return torch.cat(channels, dim=1)
 
 # modified from https://github.com/AghdamAmir/3D-UNet/blob/main/unet3d.py
+# allows for different implementation compared to unet
 class Conv3DBlock(nn.Module):
     """
     Downsampling block for U-Net.
@@ -42,7 +41,7 @@ class Conv3DBlock(nn.Module):
         down_pad     -- size of the circular padding
         cond_dim     -- dimension of conditional input
         bottleneck   -- whether this is the bottlneck block
-        break_dims   -- the index of dimensions at which translation symmetry
+        break_dims   -- the indices of dimensions at which translation symmetry
                         should be broken
     """
 
@@ -67,7 +66,8 @@ class Conv3DBlock(nn.Module):
         self.act = nn.SiLU()
         self.bottleneck = bottleneck
         if not bottleneck:
-            self.pooling = nn.MaxPool3d(
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
                 kernel_size=down_kernel, stride=down_stride, padding=down_pad
             )
 
@@ -91,11 +91,11 @@ class Conv3DBlock(nn.Module):
         # pooling
         out = None
         if not self.bottleneck:
-            out = self.pooling(res)
+            out = add_coord_channels(res, self.break_dims)
+            out = self.pooling(out)
         else:
             out = res
         return out, res
-
 
 class UpConv3DBlock(nn.Module):
 
@@ -110,8 +110,8 @@ class UpConv3DBlock(nn.Module):
         up_crop        -- size of cropping in the circular dimension
         cond_dim       -- dimension of conditional input
         output_padding -- argument forwarded to ConvTranspose
-        break_dims     -- the index of dimensions at which translation symmetry
-                          should be broken
+        break_dims   -- the indices of dimensions at which translation symmetry
+                should be broken
     """
 
     def __init__(self, in_channels, out_channels, up_kernel=None, up_stride=None,
@@ -185,7 +185,7 @@ class UNet(nn.Module):
         encode_c       -- Whether or not to embed the conditional input
         encode_c_dim   -- Dimension of the condition embedding            
         activation     -- Activation function for hidden layers
-        break_dims     -- the index of dimensions at which translation symmetry
+        break_dims     -- the indices of dimensions at which translation symmetry
                           should be broken                  
         bayesian       -- Whether or not to use bayesian layers
     """
@@ -203,12 +203,12 @@ class UNet(nn.Module):
             'level_kernels': [[3, 2, 3], [3, 2, 3]],
             'level_strides': [[3, 2, 3], [3, 2, 3]],
             'level_pads': [0, 0],
+            'break_dims': None,
             'encode_t': False,
             'encode_t_dim': 32,
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
-            'activation': nn.SiLU(),
             'bayesian': False,
         }
 
@@ -344,7 +344,10 @@ class CylindricalConv3DBlock(nn.Module):
                 (down_kernel if type(down_kernel) is int else down_kernel[-2])
               - (down_stride if type(down_stride) is int else down_stride[-2])
             )
-            self.pooling = nn.MaxPool3d(kernel_size=down_kernel, stride=down_stride)
+            self.pooling = nn.Conv3d(
+                in_channels=out_channels+len(self.break_dims), out_channels=out_channels,
+                kernel_size=down_kernel, stride=down_stride
+            )
             
     def forward(self, input, condition=None):
 
@@ -368,6 +371,7 @@ class CylindricalConv3DBlock(nn.Module):
         out = None
         if not self.bottleneck:
             out = self.circ_pad(res, self.down_pad_size)
+            out = add_coord_channels(out, self.break_dims)            
             out = self.pooling(out)
         else:
             out = res
@@ -495,7 +499,6 @@ class CylindricalUNet(nn.Module):
                   encode_t_scale -- Scale for the Gaussian Fourier projection
                   encode_c       -- Whether or not to embed the conditional input
                   encode_c_dim   -- Dimension of the condition embedding
-                  activation     -- Activation function for hidden layers
                   bayesian       -- Whether or not to use bayesian layers
     """
 
@@ -516,7 +519,6 @@ class CylindricalUNet(nn.Module):
             'encode_t_scale': 30,
             'encode_c': False,
             'encode_c_dim': 32,
-            'activation': nn.SiLU(),
             'bayesian': False,
         }
 

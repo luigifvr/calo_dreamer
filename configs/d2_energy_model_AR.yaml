@@ -1,4 +1,4 @@
-run_name: d2_energy_model_ARtransformer_5000e
+run_name: d2_energy_model_ARtransformer_LTF
 dtype: float32
 
 # Model
@@ -7,7 +7,7 @@ model_type: energy
 # Data
 hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
 eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
-xml_filename: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -15,32 +15,28 @@ eval_dataset: "2"
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/binning_dataset_2.xml,
+        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectDims: {start: -45, end: 0},
     ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
-    StandardizeFromFile: {
-        mean_path: /remote/gpu05/palacios/calo_dreamer/dat/means_2_1_us.npy,
-        std_path: /remote/gpu05/palacios/calo_dreamer/stds_2_1_us.npy,
-        create: True
-    },
+    StandardizeFromFile: {},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
+    Reshape: {shape: [45, 1]}
 }
 
 # Training
 lr: 1.e-3
-#max_lr: 1.e-3
-batch_size: 4096
-validate_every: 1
+max_lr: 2.e-3
+batch_size: 4000
+validate_every: 5
 use_scheduler: True
-lr_scheduler: CosineAnnealing
+lr_scheduler: one_cycle_lr
 #weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 1000
-cycle_epochs: 1000
-cycle_pct_start: 0.1
+n_epochs: 500
+cycle_epochs: 500
 save_interval: 100_001
 
 # Sampling
@@ -49,8 +45,7 @@ sample_every: 10
 sample_every_n_samples: 1001
 solver_kwargs: {method: dopri5, atol: 1.e-4, rtol: 1.e-6}
 
-
-shape: [45] # number of calorimeter layers
+shape: [45] # number of calorimeter layers X in_dim
 
 ## ResNet block
 #network: Conditional_Resnet
@@ -66,14 +61,13 @@ n_head: 4
 n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
-#c_embed: True
-#x_embed: True
+#encode_c_dim: 64
 n_con: 1
 conditional: True
-
+normalization: LayerNorm
+#c_embed: True
+#x_embed: True
 #conditional: True
 #encode_t: True
 #encode_t_dim: 64
 #encode_c: True
-#encode_c_dim: 64
-#normalization: LayerNorm

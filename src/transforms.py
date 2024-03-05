@@ -4,6 +4,7 @@ import os
 
 from challenge_files import *
 from challenge_files import XMLHandler
+from itertools import pairwise
 
 def logit_trafo(array, alpha=1.e-6, inv=False):
     if inv:
@@ -306,6 +307,48 @@ class SelectiveUniformNoise(object):
             transformed = shower + noise.reshape(shower.shape).to(shower.device)
         return transformed, energy        
 
+class SetToVal(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, val=0.):
+        self.val = val
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        else:
+            mask = (shower < self.val)
+            transformed = shower
+            if self.val:
+                transformed[mask] = self.val
+        return transformed, energy        
+
+class ZeroMask2(object):
+    """
+    Masks voxels to zero in the reverse transformation
+        cut: threshold value for the mask
+    """
+    def __init__(self, cut=0.):
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        return transformed, energy        
+
 class ZeroMask(object):
     """
     Masks voxels to zero in the reverse transformation
@@ -373,7 +416,22 @@ class Reshape(object):
         else:
             shower = shower.reshape(-1, *self.shape)
         return shower, energy
-    
+ 
+class Reweight(object):
+    """
+    Reweight voxels
+    """
+
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            shower = shower**(1/self.factor)
+        else:
+            shower = shower**(self.factor)
+        return shower, energy
+
 class NormalizeByElayer(object):
     """
     Normalize each shower by the layer energy
@@ -385,61 +443,66 @@ class NormalizeByElayer(object):
         self.eps = eps
         self.xml = XMLHandler.XMLHandler(xml_file, ptype)
         self.layer_boundaries = np.unique(self.xml.GetBinEdges())
-        self.number_of_layers = len(self.layer_boundaries) - 1
+        self.n_layers = len(self.layer_boundaries) - 1
 
     def __call__(self, shower, energy, rev=False):
         if rev:
             # Testing no casting to float64
             #shower = shower.to(torch.float64)
 
-            extra_dims = shower[..., -self.number_of_layers:]
-            extra_dims[:, (-self.number_of_layers+1):] = torch.clip(extra_dims[:, (-self.number_of_layers+1):], min=torch.tensor(0., device=shower.device), max=torch.tensor(1., device=shower.device))   #clipping 
-            shower = shower[:, :-self.number_of_layers]
-            transformed = torch.zeros_like(shower)
+            # select u features
+            us = shower[:, -self.n_layers:]
+            
+            # clip u_{i>0} into [0,1]
+            us[:, (-self.n_layers+1):] = torch.clip(
+                us[:, (-self.n_layers+1):],
+                min=torch.tensor(0., device=shower.device),
+                max=torch.tensor(1., device=shower.device)
+            ) 
+            
+            # select voxels
+            shower = shower[:, :-self.n_layers]
 
-            layer_energies = []
-            en_tot = torch.multiply(energy.flatten(), extra_dims[:,0])
-            cum_sum = torch.zeros_like(en_tot)
-            for i in range(extra_dims.shape[-1]-1):
-                ens = (en_tot - cum_sum)*extra_dims[:,i+1]
-                layer_energies.append(ens)
-                cum_sum += ens
-
-            layer_energies.append((en_tot - cum_sum))
-            layer_energies = torch.vstack(layer_energies).T
+            # calculate unnormalised energies from the u's
+            layer_Es = []
+            total_E = torch.multiply(energy.flatten(), us[:,0]) # Einc * u_0
+            cum_sum = torch.zeros_like(total_E)
+            for i in range(us.shape[-1]-1):
+                layer_E = (total_E - cum_sum) * us[:,i+1]
+                layer_Es.append(layer_E)
+                cum_sum += layer_E
+            layer_Es.append(total_E - cum_sum)
+            print(f'{layer_Es[0].shape=}')
+            layer_Es = torch.vstack(layer_Es).T
+            print(f'{layer_Es.shape=}')
+            
             # Normalize each layer and multiply it with its original energy
-            for layer_index, (layer_start, layer_end) in enumerate(zip(self.layer_boundaries[:-1], self.layer_boundaries[1:])):
-                transformed[..., layer_start:layer_end] = shower[..., layer_start:layer_end] * layer_energies[..., [layer_index]]  / \
-                                             (torch.sum(shower[..., layer_start:layer_end], axis=1, keepdims=True) + self.eps)
+            transformed = torch.zeros_like(shower)
+            for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
+                layer = shower[:, start:end] # select layer
+                layer /= layer.sum(-1, keepdims=True) + self.eps # normalize to unity
+                transformed[:, start:end] = layer * layer_Es[:,[l]] # scale to layer energy
 
         else:
-            #calculate extra dimensions
-            layer_energies = []
-             
-            for layer_start, layer_end in zip(self.layer_boundaries[:-1], self.layer_boundaries[1:]):
-                layer_energy = torch.sum(shower[:, layer_start:layer_end], dim=1, keepdim=True)
+            # compute layer energies
+            layer_Es = []
+            for start, end in pairwise(self.layer_boundaries):
+                layer_E = torch.sum(shower[:, start:end], dim=1, keepdims=True)
+                shower[:, start:end] /= layer_E + self.eps # normalize to unity
+                layer_Es.append(layer_E) # store layer energy
+            layer_Es = torch.cat(layer_Es, dim=1).to(shower.device)
 
-                shower[:, layer_start:layer_end] = shower[:, layer_start:layer_end] / (layer_energy + self.eps)
-                layer_energies.append(layer_energy)
-        
-            layer_energies_torch = torch.cat(layer_energies, dim=1).to(shower.device)
-
-            # Compute the generalized extra dimensions
-            extra_dims = [torch.sum(layer_energies_torch, dim=1, keepdim=True) / energy]
-
-            for layer_index in range(len(self.layer_boundaries)-2):
-                extra_dim = layer_energies_torch[..., [layer_index]] / (torch.sum(layer_energies_torch[:, layer_index:], dim=1, keepdim=True) + self.eps)
+            # compute generalized extra dimensions
+            extra_dims = [torch.sum(layer_Es, dim=1, keepdim=True) / energy]
+            for l in range(layer_Es.shape[1]-1):
+                remaining_E = torch.sum(layer_Es[:, l:], dim=1, keepdim=True)
+                extra_dim = layer_Es[:, [l]] / (remaining_E+ self.eps)
                 extra_dims.append(extra_dim)
-        
             extra_dims = torch.cat(extra_dims, dim=1)
-            # normalize by E_layer
-            for layer_index, (layer_start, layer_end) in enumerate(zip(self.layer_boundaries[:-1], self.layer_boundaries[1:])):
-                shower[:, layer_start:layer_end] = shower[:, layer_start:layer_end] / ( torch.sum(shower[:, layer_start:layer_end], dim=1, keepdim=True) + self.eps)
-
+            
             transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
-
 class AddCoordChannels(object):
     """
     Add channel to image containing the coordinate value along particular

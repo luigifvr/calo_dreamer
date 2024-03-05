@@ -427,6 +427,11 @@ def plot_histograms(hlf_class, reference_class, arg):
     plot_ECWidthEtas(hlf_class, reference_class, arg)
     plot_ECWidthPhis(hlf_class, reference_class, arg)
     plot_sparsity(hlf_class, reference_class, arg)
+    plot_weighted_depth_a(hlf_class, reference_class, arg)
+    plot_weighted_depth_r(hlf_class, reference_class, arg)
+    # grouped
+    plot_weighted_depth_a(hlf_class, reference_class, arg, l=9)
+    plot_weighted_depth_r(hlf_class, reference_class, arg, l=9)
     if arg.dataset[0] == '1':
         plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
 
@@ -525,7 +530,7 @@ def run_from_py(sample, energy, doc, params):
                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
     hlf = HLF.HighLevelFeatures(particle,
-                                filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                     args.dataset.replace('-', '_')))
     
     #Checking for negative values, nans and infinities
@@ -554,7 +559,7 @@ def run_from_py(sample, energy, doc, params):
     )
     reference_shower[reference_shower<args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
 
@@ -584,12 +589,12 @@ def run_from_py(sample, energy, doc, params):
         print("Plotting average shower: DONE.\n")
 
         print("Plotting randomly selected reference and generated shower: ")
-        hlf.DrawSingleShower(sample[:10], 
+        hlf.DrawSingleShower(sample[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
                              title="Single shower")
-        hlf.DrawSingleShower(reference_shower[:10], 
+        hlf.DrawSingleShower(reference_shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'reference_single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
@@ -748,20 +753,20 @@ def main(raw_args=None):
     if not os.path.isdir(args.output_dir):
         os.makedirs(args.output_dir)
 
-    source_file = h5py.File(args.input_file, 'r')
-    check_file(source_file, args, which='input')
+    with h5py.File(args.input_file, 'r') as source_file:
+        # check_file(source_file, args, which='input')
+        particle = {'1-photons': 'photon', '1-pions': 'pion',
+                    '2': 'electron', '3': 'electron'}[args.dataset]
+        args.particle = particle
+        # minimal readout per voxel, ds1: from Michele, ds2/3: 0.5 keV / 0.033 scaling factor
+        args.min_energy = {'1-photons': 0.001, '1-pions': 0.001,
+                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
-    particle = {'1-photons': 'photon', '1-pions': 'pion',
-                '2': 'electron', '3': 'electron'}[args.dataset]
-    args.particle = particle
-    # minimal readout per voxel, ds1: from Michele, ds2/3: 0.5 keV / 0.033 scaling factor
-    args.min_energy = {'1-photons': 0.001, '1-pions': 0.001,
-                       '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
-
-    hlf = HLF.HighLevelFeatures(particle,
-                                filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
-                                    args.dataset.replace('-', '_')))
-    shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
+        hlf = HLF.HighLevelFeatures(
+            particle, filename='src/challenge_files/binning_dataset_{}.xml'.format(
+                                        args.dataset.replace('-', '_'))
+        )
+        shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
 
     #Checking for negative values, nans and infinities
     print("Checking for negative values, number of negative energies: ")
@@ -781,11 +786,11 @@ def main(raw_args=None):
     print('Storing reference .pkl file in folder: {}'.format(args.source_dir))
     args.reference_file_name = os.path.splitext(args.reference_file_name)[0]
 
-    reference_file = h5py.File(args.reference_file, 'r')
-    check_file(reference_file, args, which='reference')
-
-    reference_shower, reference_energy = extract_shower_and_energy(reference_file,
-                                                                   which='reference', single_energy=args.energy)
+    with h5py.File(args.reference_file, 'r') as reference_file:
+        # check_file(reference_file, args, which='reference')
+        reference_shower, reference_energy = extract_shower_and_energy(
+            reference_file, which='reference', single_energy=args.energy
+        )
     reference_shower[reference_shower<args.cut] = 0.0
 
     #if os.path.exists(os.path.join(args.source_dir, args.reference_file_name + '.pkl')):
@@ -795,7 +800,7 @@ def main(raw_args=None):
     #else:
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
     #save_reference(reference_hlf,
@@ -830,12 +835,12 @@ def main(raw_args=None):
         print("Plotting average shower: DONE.\n")
 
         print("Plotting randomly selected reference and generated shower: ")
-        hlf.DrawSingleShower(shower[:10], 
+        hlf.DrawSingleShower(shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'single_shower_dataset_{}.png'.format(
                                                             args.dataset)),
                              title="Single shower")
-        hlf.DrawSingleShower(reference_shower[:10], 
+        hlf.DrawSingleShower(reference_shower[:5], 
                              filename=os.path.join(args.output_dir,
                                                     'reference_single_shower_dataset_{}.png'.format(
                                                             args.dataset)),

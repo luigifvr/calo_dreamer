@@ -1,9 +1,9 @@
-run_name: d2_2000_epoch_shape_model_utransformer_
+run_name: d2_AR_200
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /remote/gpu05/palacios/calo_dreamer/results/20240114_171330_d2_energy_model_ARtransformer_
+energy_model: /remote/gpu02/ore/calo_dreamer/results/20240222_201728_d2_energy_model_ARtransformer_LTF
 
 # Data
 hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
@@ -14,7 +14,7 @@ eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
 eval_cut: 15.15e-3
-shape: [1, 45, 16, 9]
+shape: [45, 1, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
@@ -35,20 +35,20 @@ transforms: {
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
-    Reshape: {shape: [1, 45, 16, 9]}
+    Reshape: {shape: [45, 1, 16, 9]}
 }
 
 # Training
-lr: 5.e-3
-#max_lr: 1.e-3
-batch_size: 1024
+lr: 1.e-3
+max_lr: 5.e-4
+batch_size: 250
 validate_every: 10
 use_scheduler: True
-lr_scheduler: CosineAnnealing
-#weight_decay: 0.001
+lr_scheduler: one_cycle_lr
+weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 2000
-cycle_epochs: 2000
+n_epochs: 200
+cycle_epochs: 200
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -57,17 +57,18 @@ sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
 solver_kwargs: {method: midpoint, options: {step_size: 0.01}}
-sample_us: True
+sample_us: False
 
 # Network
-network: UNet
-condition_dim: 46
-break_dims: [2, 4]
-level_channels: [32, 64, 128]
-level_kernels: [[3,2,3], [3,2,3]]
-level_strides: [[3,2,3], [3,2,3]]
-level_pads: [0, 0]
-encode_t: True
-encode_t_dim: 100
-encode_c: True
-encode_c_dim: 100
+model: TransfusionAR
+network: ARtransformer_shape
+n_con: 46
+dim_embedding: 256
+n_head: 4
+n_encoder_layers: 4
+n_decoder_layers: 4
+dim_feedforward: 512
+encode_t_dim: 64
+normalization: LayerNorm
+unet_kernel: [4, 9]
+unet_stride: [4, 9]

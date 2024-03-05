@@ -1,0 +1,51 @@
+run_name: d3_latent
+dtype: float32
+
+# Data
+hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_1.hdf5
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/3/dataset_3_full_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_3.xml
+val_frac: 0.2
+eps: 1.0e-10
+particle_type: electron
+eval_dataset: "3"
+eval_cut: 15.15e-3
+# shape: [4, 15, 16, 16] # factor ~7
+shape: [4, 15, 24, 16] # factor 1.75
+
+# Network
+model_type: shape
+model: TBD
+network: ViT
+condition_dim: 46
+patch_shape: [3,4,4]
+hidden_dim: 480
+depth: 5
+num_heads: 8
+mlp_ratio: 4.0
+
+# Secondary models
+energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
+# autoencoder: /home/aore/calo_dreamer/results/20240128_235248_d3_ae # factor ~2.6
+autoencoder: /data/projects/punim0011/aore/calo_dreamer_runs/20240205_041200_d3_ae # factor 1.75
+
+# Training
+lr: 1.e-3
+max_lr: 1.e-3
+div_factor: 200
+batch_size: 250
+validate_every: 5
+use_scheduler: True
+lr_scheduler: one_cycle_lr
+weight_decay: 0.0001
+betas: [0.9, 0.999]
+n_epochs: 500
+cycle_epochs: 500
+cycle_pct_start: 0.1
+save_interval: 100_001
+
+# Sampling
+sample_periodically: False
+sample_every: 10
+sample_every_n_samples: 1001
+solver_kwargs: {method: midpoint, options: {step_size: 0.02}}

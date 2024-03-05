@@ -9,19 +9,19 @@ from transforms import *
 
 def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
                 transforms, eps=1.e-10, device='cpu', shuffle=True, width_noise=0.0,
-                single_energy=None):
+                single_energy=None, aug_transforms=False):
 
     print("Dict of preprocessing is: ")
     print(transforms)
 
     train_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename, 
                     val_frac=val_frac, transform=transforms, split='training', device=device,
-                    single_energy=single_energy)
+                    single_energy=single_energy, aug_transforms=aug_transforms)
     
     
     val_dataset = CaloChallengeDataset(hdf5_file, particle_type, xml_filename,
                     val_frac=val_frac, transform=transforms, split='validation', device=device,
-                    single_energy=single_energy)
+                    single_energy=single_energy, aug_transforms=aug_transforms)
     
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
@@ -32,7 +32,7 @@ def get_loaders(hdf5_file, particle_type, xml_filename, val_frac, batch_size,
 class CaloChallengeDataset(Dataset):
     """ Dataset for CaloChallenge showers """
     def __init__(self, hdf5_file, particle_type, xml_filename, val_frac=0.3, 
-            transform=None, split=None, device='cpu', single_energy=None):
+            transform=None, split=None, device='cpu', single_energy=None, aug_transforms=False):
         """
         Arguments:
             hdf5_file: path to hdf5 file
@@ -46,6 +46,7 @@ class CaloChallengeDataset(Dataset):
         del self.voxels
                 
         self.transform = transform
+        self.aug_transforms = aug_transforms
         self.device = device
         self.dtype = torch.get_default_dtype()
         
@@ -78,4 +79,9 @@ class CaloChallengeDataset(Dataset):
         return len(self.energy)
 
     def __getitem__(self, idx):
+        if self.aug_transforms:
+            randint = torch.randint(high=self.layers.shape[-2], size=(1,))
+            indxs = torch.arange(self.layers.shape[-2])
+            rot_lay = self.layers[idx, :, :, (indxs+randint)%self.layers.shape[-2]]
+            return rot_lay, self.energy[idx], self.layers[idx]
         return self.layers[idx], self.energy[idx]

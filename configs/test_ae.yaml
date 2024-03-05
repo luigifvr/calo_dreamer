@@ -1,15 +1,15 @@
-run_name: d2_ae_softmax_temp_0.75
+run_name: d2_test_ae
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /home/aore/calo_dreamer/results/20240105_025022_d2_energy_model
+energy_model: /remote/gpu06/favaro/CaloDream/calo_dreamer/results/20240103_191958_d3_energy_model/
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5 # for the ae this is the training file
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
-val_frac: 0.05
+hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+val_frac: 0.01
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
@@ -18,10 +18,12 @@ shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-      ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+      ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
       xml_file: electron
     },
-    # SelectiveUniformNoise: {
+    ZeroMask: {cut: 1.e-4},
+    #Reweight: {factor: 0.9},
+    #SelectiveUniformNoise: {
     #    noise_width: 1.0e-6,
     #    cut: True,
     #    exclusions: [-45, -44, -43, -42, -41, -40, -39, -38, -37,
@@ -29,10 +31,9 @@ transforms: {
     #                 -27, -26, -25, -24, -23, -22, -21, -20, -19,
     #                 -18, -17, -16, -15, -14, -13, -12, -11, -10,
     #                  -9,  -8,  -7,  -6,  -5,  -4,  -3,  -2,  -1]
-    # },
-    # ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
-    # StandardizeFromFile: {model_dir: ''},
-
+    #},
+    #ExclusiveLogitTransform: {delta: 1.0e-6, exclusions: [-45]},
+    #StandardizeFromFile: {model_dir: ''},
     LogEnergy: {},
     ScaleEnergy: {e_min: 6.907755, e_max: 13.815510},
     AddFeaturesToCond: {split_index: 6480},
@@ -42,14 +43,14 @@ transforms: {
 # Training
 lr: 1.e-3
 max_lr: 1.e-3
-batch_size: 128
-validate_every: 1
+batch_size: 500
+validate_every: 10
 use_scheduler: True
 lr_scheduler: one_cycle_lr
 weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 100 #200
-cycle_epochs: 100 #200
+n_epochs: 500
+cycle_epochs: 500
 cycle_pct_start: 0.2
 save_interval: 100_001
 
@@ -71,8 +72,6 @@ ae_level_channels: [64, 4]
 ae_level_kernels: [[3,4,3]]
 ae_level_strides: [[3,2,1]]
 ae_level_pads: [[0,0,0]]
-ae_break_dims: [2,4]
 ae_encode_c: True
 ae_encode_c_dim: 100
-# ae_softmax_temp: 0.75
-
+ae_break_dims: [2,4]
