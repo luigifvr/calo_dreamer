@@ -38,6 +38,10 @@ class HighLevelFeatures:
         self.width_etas = {}
         self.width_phis = {}
         self.sparsity = {}
+        self.weighted_depth_a = {}
+        self.weighted_depth_r = {}
+        self.weighted_depth_ga = {}
+        self.weighted_depth_gr = {}
         self.particle = particle
         self.colors = cm.gnuplot2(np.linspace(0.2, 0.8, 3))
         if self.particle == 'photon':
@@ -75,6 +79,57 @@ class HighLevelFeatures:
         """ Computes the sparsity of the given layer"""
         return (layer_data > 0).mean(axis=1)
 
+    def _calculate_WeightedDepth(self, energy_layer, layer):
+        """ Calculate the energy sum weighted by the layer index"""
+        return layer*energy_layer
+
+    def CalculateWeightedDepthA(self, energy_calo, edge_idx, ngroups=1, k=0):
+        # sum over angles
+        weighted_s = 0.
+        total_energy = 0.
+        n_layers = len(self.relevantLayers) 
+        fraction = int(n_layers/ngroups)
+        for l in self.relevantLayers[k*fraction:(k+1)*fraction]:
+            data_l = energy_calo[:, self.bin_edges[l]:self.bin_edges[l+1]]
+            energy_sum = data_l[:, edge_idx::self.num_alpha[0]].sum(axis=-1)
+            total_energy += energy_sum
+            weighted_s += self._calculate_WeightedDepth(energy_sum, l)
+        return weighted_s/(total_energy+1.e-8)
+
+    def CalculateWeightedDepthR(self, energy_calo, edge_idx, ngroups=1, k=0):
+        #sum over radii
+        weighted_r = 0.
+        total_energy_r = 0.
+        n_layers = len(self.relevantLayers)
+        fraction = int(n_layers/ngroups)
+        for l in self.relevantLayers[k*fraction:(k+1)*fraction]:
+            data_l = energy_calo[:, self.bin_edges[l]:self.bin_edges[l+1]]
+            energy_sum = data_l[:, edge_idx*(len(self.r_edges[0])-1):(edge_idx+1)*len(self.r_edges[0])-1].sum(axis=-1)
+            total_energy_r += energy_sum
+            weighted_r += self._calculate_WeightedDepth(energy_sum, l)
+        return weighted_r/(total_energy_r+1.e-8)
+
+    def GetGroupedWeightedDepths(self, energy_calo, l=5):
+        n_groups = len(self.relevantLayers)/l
+        j=0
+        for k in range(int(n_groups)):
+            for n in range((len(self.r_edges[0])-1)):
+                self.weighted_depth_ga[j] = self.CalculateWeightedDepthA(energy_calo, n, n_groups, k)
+                j += 1
+        
+        j=0
+        for k in range(int(n_groups)):
+            for n in range((self.num_alpha[0])):
+                self.weighted_depth_gr[j] = self.CalculateWeightedDepthR(energy_calo, n, n_groups, k)
+                j += 1
+
+    def GetWeightedDepths(self, energy_calo):
+        for n in range(len(self.r_edges[0])-1):
+            self.weighted_depth_a[n] = self.CalculateWeightedDepthA(energy_calo, n)
+
+        for n in range(self.num_alpha[0]):
+            self.weighted_depth_r[n] = self.CalculateWeightedDepthR(energy_calo, n)
+
     def CalculateFeatures(self, data):
         """ Computes all high-level features for the given data """
         self.E_tot = data.sum(axis=-1)
@@ -95,6 +150,8 @@ class HighLevelFeatures:
                         data[:, self.bin_edges[l]:self.bin_edges[l+1]])
                     
                 self.sparsity[l] = self._calculate_sparsity(data[:, self.bin_edges[l]:self.bin_edges[l+1]])
+        self.GetWeightedDepths(data)
+        self.GetGroupedWeightedDepths(data)
 
     def _DrawSingleLayer(self, data, layer_nr, filename, title=None, fig=None, subplot=(1, 1, 1),
                          vmax=None, colbar='alone'):
@@ -236,6 +293,18 @@ class HighLevelFeatures:
 
     def GetSparsity(self):
         return self.sparsity
+
+    def GetWeightedDepthA(self):
+        return self.weighted_depth_a
+    
+    def GetWeightedDepthR(self):
+        return self.weighted_depth_r
+    
+    def GetGroupedWeightedDepthR(self):
+        return self.weighted_depth_gr
+    
+    def GetGroupedWeightedDepthA(self):
+        return self.weighted_depth_ga
     
     def DrawAverageShower(self, data, filename=None, title=None):
         """ plots average of provided showers """
