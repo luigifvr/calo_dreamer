@@ -248,7 +248,7 @@ def train_and_evaluate_cls(model, data_train, data_test, optim, arg):
     try:
         for i in range(arg.cls_n_epochs):
             train_cls(model, data_train, optim, i, arg)
-            with torch.no_grad():
+            with torch.inference_mode():
                 eval_acc, _, _ = evaluate_cls(model, data_test, arg)
             if eval_acc > best_eval_acc:
                 best_eval_acc = eval_acc
@@ -479,7 +479,7 @@ def eval_ui_dists(source_array, reference_array, documenter, params):
     train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
     classifier = load_classifier(classifier, args)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         print("Now looking at independent dataset:")
         eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
                                                     final_eval=True,
@@ -729,7 +729,7 @@ def run_from_py(sample, energy, doc, params):
         train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
         classifier = load_classifier(classifier, args)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             print("Now looking at independent dataset:")
             eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
                                                         final_eval=True,
@@ -979,7 +979,7 @@ def main(raw_args=None):
         train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
         classifier = load_classifier(classifier, args)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             print("Now looking at independent dataset:")
             eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
                                                         final_eval=True,

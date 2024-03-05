@@ -113,7 +113,7 @@ class ARtransformer(nn.Module):
             return v
 
         # Solve ODE from t=1 to t=0
-        with torch.no_grad():
+        with torch.inference_mode():
             x_t = odeint(
                 net_wrapper,
                 x_0,

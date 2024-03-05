@@ -157,11 +157,11 @@ class BespokeSolver(nn.Module):
             t_sol = torch.tensor(
                 [0, 1], dtype=torch.float32, device=self.device
             )
-            with torch.no_grad():
+            with torch.inference_mode():
                 x_true = odeint(f, x0, t_sol, **self.truth_tols)[-1]
             return self.gte_loss(x_true, x0, cond)
         
-        with torch.no_grad():
+        with torch.inference_mode():
             t_stop = self.t_sol.detach()
             x_true = odeint(f, x0, t_stop, **self.truth_tols)
             vel =  f(t_stop, x_true)
@@ -173,7 +173,7 @@ class BespokeSolver(nn.Module):
         if self.loss == 'lte':
             return self.lte_loss(x_aux, cond)
 
-    # @torch.no_grad()
+    # @torch.inference_mode()
     def solve(self, cond=None, x0=None):
         """Alg. 2 and Eq. 17"""
 
@@ -191,7 +191,7 @@ class BespokeSolver(nn.Module):
         """A generator for sampling conditions during training and inference."""
         for _ in range(iterations):
             Eincs = torch.rand([batch_size, 1], device=self.device) # Assumes u_model expects Einc uniform in [0,1]
-            with torch.no_grad():
+            with torch.inference_mode():
                 u_samples = self.u_model.sample_batch(Eincs)
             yield torch.cat([Eincs, u_samples], dim=1) 
 
@@ -298,7 +298,7 @@ class BespokeSolver(nn.Module):
             samples, c = self.sample_n()
             self.plot_samples(samples=samples, conditions=c)     
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def sample_n(self):
         print("generate_samples: Start generating samples", flush=True)
         t_0 = time.time()

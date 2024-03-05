@@ -258,24 +258,23 @@ class GenerativeModel(nn.Module):
                 self.logger.add_scalar("learning_rate_epoch", self.scheduler.get_last_lr()[0],
                                        self.epoch)
 
+    @torch.inference_mode()
     def validate_one_epoch(self):
+        
         val_losses = np.array([])
-
         # iterate batch wise over input
-        with torch.no_grad():
-            for batch_id, x in enumerate(self.val_loader):
+        for batch_id, x in enumerate(self.val_loader):
 
-                # calculate batch loss
-                loss = self.batch_loss(x)
+            # calculate batch loss
+            loss = self.batch_loss(x)
+            val_losses = np.append(val_losses, loss.item())
+            # if self.log:
+            #     self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
 
-                val_losses = np.append(val_losses, loss.item())
-                # if self.log:
-                #     self.logger.add_scalar("val_losses", val_losses[-1], self.epoch*self.n_trainbatches + batch_id)
-
-            self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
-            self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
-            if self.log:
-                self.logger.add_scalar("val_losses_epoch", self.val_losses_epoch[-1], self.epoch)
+        self.val_losses_epoch = np.append(self.val_losses_epoch, val_losses.mean())
+        self.val_losses = np.concatenate([self.val_losses, val_losses], axis=0)
+        if self.log:
+            self.logger.add_scalar("val_losses_epoch", self.val_losses_epoch[-1], self.epoch)
 
     def batch_loss(self, x):
         pass
