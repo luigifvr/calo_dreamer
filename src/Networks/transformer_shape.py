@@ -89,15 +89,13 @@ class ARtransformer_shape(nn.Module):
         dtype = c.dtype
         device = c.device
 
-        net = self.subnet
         x_0 = torch.randn((batch_size, *self.shape[1:]), device=device, dtype=dtype)
 
         # NN wrapper to pass into ODE solver
         def net_wrapper(t, x_t):
             #t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype, device=device)
-            t_torch = t * torch.ones((x_t.size(0), 1), dtype=dtype, device=device)
-            t_torch = self.t_embed(t_torch)
-            v = net(x_t, torch.cat([t_torch.reshape(batch_size, -1), c.squeeze()], dim=-1))
+            t_torch = t * torch.ones((batch_size, 1), dtype=dtype, device=device)
+            v = self.subnet(x_t, t_torch, c.flatten(0,1))
             return v
 
         # Solve ODE from t=1 to t=0
@@ -113,20 +111,14 @@ class ARtransformer_shape(nn.Module):
 
         return x_1.unsqueeze(1)
 
-    def forward(self, c,x_t=None, t=None, x=None, rev=False):
+    def forward(self, c, x_t=None, t=None, x=None, rev=False):
         if not rev:
             x = x.flatten(2) # b l c x y -> b l (c x y)
             xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
-                src=self.compute_embedding(
-                    c,
-                    dim=self.dims_c,
-                    embedding_net=self.c_embed,
-                ),
+                src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                 tgt=self.compute_embedding(
-                    xp,
-                    dim=self.n_energy_layers + 1,
-                    embedding_net=self.x_embed,
+                    xp, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
                 ),
                 tgt_mask=torch.ones(
                     (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
@@ -134,31 +126,24 @@ class ARtransformer_shape(nn.Module):
             )
             
             x_t = x_t.flatten(0,1) # b l c x y -> (b l) c x y
-            t = t.flatten(2)       # b l c x y -> b l (c x y)
-            condition = torch.cat([self.t_embed(t), embedding], dim=-1)
-            pred = self.subnet(x_t, condition)
+            pred = self.subnet(x_t, t.reshape((-1, 1)), embedding.flatten(0,1))
             pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
         else:
-            x = torch.zeros((c.shape[0], 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
-            c_embed = self.compute_embedding(
-            c, dim=self.dims_c, embedding_net=self.c_embed)
+            x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
+            c_embed = self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.n_energy_layers):
                 x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
                     src=c_embed,
                     tgt=self.compute_embedding(
-                        x,
-                        dim=self.n_energy_layers  + 1,
-                        embedding_net=self.x_embed,
+                        x, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
                     ),
                     tgt_mask=torch.ones(
-                        (x.shape[1], x.shape[1]), device=x.device, dtype=torch.bool
+                        (x.size(1), x.size(1)), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
-                x_new = self.sample_dimension(
-                    embedding[:, -1:,:]
-                )
+                x_new = self.sample_dimension(embedding[:, -1:,:])
                 x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
                 x = torch.cat((x, x_new), dim=1)
 

@@ -42,29 +42,28 @@ model_type: shape
 model: TransfusionAR
 network: ARtransformer_shape
 condition_dim: 46
-dim_embedding: 512
+dim_embedding: 1024
 n_head: 4
 n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
-encode_t_dim: 64
-c_embed: True # use additive positional encodings
+# c_embed: True
 normalization: LayerNorm
 subnet:
     class: UNet
     params:
         dim: 2
         cylindrical: True
-        condition_dim: 576 # dim_embedding + encode_t_dim (from above)
+        condition_dim: 1024 # match dim_embedding
         level_channels: [64, 64, 128]
         # level_kernels: [[7,3], [4,2]]
         # level_strides: [[5,3], [2,2]]  # (50, 18) -> (10, 6) -> (5, 3)
         level_kernels: [[4,2], [7,3]]
         level_strides: [[2,2], [5,3]]    # (50, 18) -> (25, 9) -> (5, 3)
         encode_t: True
-        encode_t_dim: 32
-        encode_c: True
-        encode_c_dim: 32
+        encode_t_dim: 100
+        # encode_c: True
+        # encode_c_dim: 100
         break_dims: [3]
 
 # Secondary models
@@ -89,8 +88,8 @@ sample_every_n_samples: 1001
 
 # Evaluation
 eval_mode: all
-n_samples: 100000
-batch_size_sample: 10000
+n_samples: 500
+batch_size_sample: 100
 sample_us: True
 solver_kwargs:
     method: rk4

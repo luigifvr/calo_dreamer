@@ -392,4 +392,4 @@ class GaussianFourierProjection(nn.Module):
 
     def forward(self, x):
         x_proj = x * self.W * 2 * torch.pi
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=1)
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
