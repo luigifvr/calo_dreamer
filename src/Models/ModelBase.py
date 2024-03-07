@@ -70,8 +70,12 @@ class GenerativeModel(nn.Module):
         self.batch_size = self.params["batch_size"]
         self.batch_size_sample = get(self.params, "batch_size_sample", 10_000)
 
-        self.epoch = get(self.params, "total_epochs", 0)
         self.net = self.build_net()
+        param_count = sum(p.numel() for p in self.net.parameters() if p.requires_grad)
+        print(f'init model: Model has {param_count} parameters')
+        self.params['parameter_count'] = param_count
+
+        self.epoch = get(self.params, "total_epochs", 0)
         self.iterations = get(self.params,"iterations", 1)
         self.regular_loss = []
         self.kl_loss = []
@@ -206,7 +210,7 @@ class GenerativeModel(nn.Module):
             sys.stdout.flush()
         t_1 = time.time()
         traintime = t_1 - t_0
-        self.params['traintime'] = traintime
+        self.params['train_time'] = traintime
         print(
             f"train_model: Finished training {n_epochs} epochs after {traintime:.2f} s = {traintime / 60:.2f} min = {traintime / 60 ** 2:.2f} h.", flush=True)
         
@@ -309,7 +313,6 @@ class GenerativeModel(nn.Module):
 
         t_0 = time.time()
 
-        # TODO: Specialize this for dataset 3, where we can just sample uniformly b/w 0 and 1
         Einc = torch.tensor(
             10**np.random.uniform(3, 6, size=get(self.params, "n_samples", 10**5)) 
             if self.params['eval_dataset'] in ['2', '3'] else
@@ -365,7 +368,7 @@ class GenerativeModel(nn.Module):
 
         t_1 = time.time()
         sampling_time = t_1 - t_0
-        self.params["sampling_time"] = sampling_time
+        self.params["sample_time"] = sampling_time
         print(
             f"generate_samples: Finished generating {len(sample)} samples "
             f"after {sampling_time} s.", flush=True

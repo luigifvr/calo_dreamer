@@ -62,6 +62,10 @@ def main():
         else:
             model.plot_saved_samples(name=f"{args.epoch}")
 
+    # save parameter file with new entries
+    with open(doc.get_file('final_params.yaml'), 'w') as f:
+        yaml.dump(model.params, f, default_flow_style=False)
+
 if __name__=='__main__':
     main()
 
