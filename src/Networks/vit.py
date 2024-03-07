@@ -7,7 +7,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 from timm.models.vision_transformer import Attention, Mlp
-# from timm.models.vision_transformer import Mlp  
+# from timm.models.vision_transformer import Mlp
 
 class ViT(nn.Module):
     """
@@ -30,6 +30,7 @@ class ViT(nn.Module):
             'mlp_ratio': 4.0,
             'attn_drop': 0.,
             'proj_drop': 0.,
+            'pos_embedding_coords': 'cartesian'
         }
 
         for k, p in defaults.items():
@@ -67,7 +68,10 @@ class ViT(nn.Module):
         
         # compute fixed position embedding
         self.pos_embed = nn.Parameter(
-            self.get_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim),
+            self.get_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
+            if self.pos_embedding_coords == 'cylindrical' else
+            self.get_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
+            if self.pos_embedding_coords == 'cartesian' else None,
             requires_grad=False
         )
 
@@ -75,8 +79,8 @@ class ViT(nn.Module):
         # l, a, r = self.num_patches
         # patch_idcs = torch.arange(l*a*r)
         # attn_mask = nn.Parameter(
-        #     # patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # causal
-        #     patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # non-causal
+        #     patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # causal
+        #     # patch_idcs[:,None]//(a*r) <= patch_idcs[None,:]//(a*r), # non-causal
         #     requires_grad=False
         # )
 
@@ -143,18 +147,14 @@ class ViT(nn.Module):
 
     @staticmethod
     def get_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):    
-
+        """
+        Embeds patch positions based directly on input indices, which are assumed
+        to be depth, angle, radius.
+        """
         L, A, R = num_patches
-        z, alpha, r = torch.meshgrid( # to cartesian
-        # z, y, x = torch.meshgrid( # keep circular
-            torch.arange(L)/L,
-            torch.arange(A)*(2*math.pi/A), # to cartesian
-            # torch.arange(A)/A, # keep circular
-            torch.arange(R)/R,
-            indexing='ij'
+        z, y, x = torch.meshgrid(
+            torch.arange(L)/L, torch.arange(A)/A,torch.arange(R)/R, indexing='ij'
         )
-        x = r*alpha.cos() # to cartesian
-        y = r*alpha.sin() # to cartesian
 
         fourier_dim = dim // 6
         omega = torch.arange(fourier_dim) / (fourier_dim - 1)
@@ -163,11 +163,36 @@ class ViT(nn.Module):
         y = y.flatten()[:, None] * omega[None, :]
         x = x.flatten()[:, None] * omega[None, :]
         
-        pe = torch.cat(
-            (x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
+        # padding can be implemented here
+
+        return pe
+
+    @staticmethod
+    def get_cartesian_sincos_pos_embed(num_patches, dim, temperature=10000):    
+        """
+        Embeds patch positions after converting input indices from polar to cartesian
+        coordinates. i.e. depth, angle, radius -> depth, height, width
+        """
+        L, A, R = num_patches
+        z, alpha, r = torch.meshgrid(
+            torch.arange(L)/L, torch.arange(A)*(2*math.pi/A), torch.arange(R)/R,
+            indexing='ij'
         )
-        # pe = F.pad(pe, (0, dim - (fourier_dim * 6))) # pad if feature dimension not cleanly divisible by 6
-        return pe        
+        x = r*alpha.cos()
+        y = r*alpha.sin()
+
+        fourier_dim = dim // 6
+        omega = torch.arange(fourier_dim) / (fourier_dim - 1)
+        omega = 1. / (temperature ** omega)    
+        z = z.flatten()[:, None] * omega[None, :]
+        y = y.flatten()[:, None] * omega[None, :]
+        x = x.flatten()[:, None] * omega[None, :]
+        
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
+        # padding can be implemented here
+
+        return pe                
 
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)

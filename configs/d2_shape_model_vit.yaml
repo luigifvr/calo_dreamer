@@ -65,6 +65,9 @@ hidden_dim: 480
 depth: 6
 num_heads: 6
 mlp_ratio: 4.0
+# attn_drop: 0.00
+# proj_drop: 0.05
+pos_embedding_coords: cartesian
 
 # patch_shape: [3, 2, 1]
 # hidden_dim: 480
