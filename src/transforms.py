@@ -6,7 +6,7 @@ from challenge_files import *
 from challenge_files import XMLHandler
 from itertools import pairwise
 
-def logit_trafo(array, alpha=1.e-6, inv=False):
+def logit(array, alpha=1.e-6, inv=False):
     if inv:
         z = torch.sigmoid(array)
         z = (z-alpha)/(1-2*alpha)
@@ -222,11 +222,9 @@ class ExclusiveLogitTransform(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            # transformed = torch.special.expit(shower)
-            transformed = logit_trafo(shower, alpha=self.delta, inv=True)
+            transformed = logit(shower, alpha=self.delta, inv=True)
         else:
-            # transformed = torch.special.logit(shower, eps=self.delta)
-            transformed = logit_trafo(shower, alpha=self.delta, inv=False)
+            transformed = logit(shower, alpha=self.delta)
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy

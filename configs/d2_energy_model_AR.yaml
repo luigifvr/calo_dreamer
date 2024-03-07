@@ -13,7 +13,7 @@ eval_dataset: "2"
 # Preprocessing
 transforms:
     ScaleVoxels:
-        factor: 0.45
+        factor: 0.35
     NormalizeByElayer:
         ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
         xml_file: electron
