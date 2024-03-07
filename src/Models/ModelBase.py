@@ -422,9 +422,11 @@ class GenerativeModel(nn.Module):
             
             # postprocess
             for fn in transforms[::-1]:
-                if fn.__class__.__name__ != 'NormalizeByElayer':
-                    samples, _ = fn(samples, conditions, rev=True)
-                    reference, _ = fn(reference, conditions, rev=True)
+                if fn.__class__.__name__ == 'NormalizeByElayer':
+                    break # this might break plotting
+                samples, _ = fn(samples, conditions, rev=True)
+                reference, _ = fn(reference, conditions, rev=True)
+
             # clip u_i's (except u_0) to [0,1] 
             samples[:,1:] = torch.clip(samples[:,1:], min=0., max=1.)
             reference[:,1:] = torch.clip(reference[:,1:], min=0., max=1.)
