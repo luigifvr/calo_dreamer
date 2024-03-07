@@ -658,8 +658,13 @@ def run_from_py(sample, energy, doc, params):
         plot_histograms(hlf, reference_hlf, args)
         plot_cell_dist(sample, reference_shower, args)
         print("Plotting histograms: DONE. \n")
+    
+    if args.mode in ['all', 'all-cls', 'cls-low', 'cls-high', 'cls-low-normed']:
+        if args.mode in ['all', 'all-cls']:
+            list_cls = ['cls-low', 'cls-high']
+        else:
+            list_cls = [args.mode]
 
-    if args.mode in ['all', 'cls-low', 'cls-high', 'cls-low-normed']:
         print("Calculating high-level features for classifier ...")
         
         print("Using {} as cut for the showers ...".format(args.cut))
@@ -675,72 +680,72 @@ def run_from_py(sample, energy, doc, params):
             #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
         print("Calculating high-level features for classifer: DONE.\n")
+        for key in list_cls:
+            if (args.mode in ['cls-low']) or (key in ['cls-low']):
+                source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
+                                                               normed=False, single_energy=args.energy)
+                reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                  normed=False, single_energy=args.energy)
+            elif (args.mode in ['cls-low-normed']) or (key in ['cls_low_normed']):
+                source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
+                                                               normed=True, single_energy=args.energy)
+                reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                  normed=True, single_energy=args.energy)
+            elif (args.mode in ['cls-high']) or (key in ['cls-high']):
+                source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0., cut=cut, single_energy=args.energy)
+                reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                    single_energy=args.energy)
 
-        if args.mode in ['all', 'cls-low']:
-            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
-                                                           normed=False, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                              normed=False, single_energy=args.energy)
-        elif args.mode in ['cls-low-normed']:
-            source_array = prepare_low_data_for_classifier(sample, energy, hlf, 0., cut=cut,
-                                                           normed=True, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                              normed=True, single_energy=args.energy)
-        elif args.mode in ['cls-high']:
-            source_array = prepare_high_data_for_classifier(sample, energy, hlf, 0., cut=cut, single_energy=args.energy)
-            reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                                single_energy=args.energy)
+            train_data, test_data, val_data = ttv_split(source_array, reference_array)
 
-        train_data, test_data, val_data = ttv_split(source_array, reference_array)
+            # set up device
+            args.device = torch.device('cuda:'+str(args.which_cuda) \
+                                       if torch.cuda.is_available() else 'cpu')
+            print("Using {}".format(args.device))
 
-        # set up device
-        args.device = torch.device('cuda:'+str(args.which_cuda) \
-                                   if torch.cuda.is_available() else 'cpu')
-        print("Using {}".format(args.device))
+            # set up DNN classifier
+            input_dim = train_data.shape[1]-1
+            DNN_kwargs = {'num_layer':args.cls_n_layer, # 2
+                          'num_hidden':args.cls_n_hidden, # 512
+                          'input_dim':input_dim,
+                          'dropout_probability':args.cls_dropout_probability} # 0
+            classifier = DNN(**DNN_kwargs)
+            classifier.to(args.device)
+            print(classifier)
+            total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
-        # set up DNN classifier
-        input_dim = train_data.shape[1]-1
-        DNN_kwargs = {'num_layer':args.cls_n_layer, # 2
-                      'num_hidden':args.cls_n_hidden, # 512
-                      'input_dim':input_dim,
-                      'dropout_probability':args.cls_dropout_probability} # 0
-        classifier = DNN(**DNN_kwargs)
-        classifier.to(args.device)
-        print(classifier)
-        total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
+            print("{} has {} parameters".format(args.mode, int(total_parameters)))
 
-        print("{} has {} parameters".format(args.mode, int(total_parameters)))
+            optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
 
-        optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
+            if args.save_mem:
+                train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()))
+                test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()))
+                val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()))
+            else:
+                train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device))
+                test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device))
+                val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device))
 
-        if args.save_mem:
-            train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()))
-            test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()))
-            val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()))
-        else:
-            train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device))
-            test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device))
-            val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device))
+            train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+            test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
+            val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
 
-        train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
-        test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
-        val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
+            train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
+            classifier = load_classifier(classifier, args)
 
-        train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
-        classifier = load_classifier(classifier, args)
-
-        with torch.inference_mode():
-            print("Now looking at independent dataset:")
-            eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
-                                                        final_eval=True,
-                                                        calibration_data=test_dataloader)
-        print("Final result of classifier test (AUC / JSD):")
-        print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
-        with open(os.path.join(args.output_dir, 'classifier_{}_{}.txt'.format(args.mode,
-                                                                              args.dataset)),
-                  'a') as f:
-            f.write('Final result of classifier test (AUC / JSD):\n'+\
-                    '{:.4f} / {:.4f}\n\n'.format(eval_auc, eval_JSD))
+            with torch.inference_mode():
+                print("Now looking at independent dataset:")
+                eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
+                                                            final_eval=True,
+                                                            calibration_data=test_dataloader)
+            print("Final result of classifier test (AUC / JSD):")
+            print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+            with open(os.path.join(args.output_dir, 'classifier_{}_{}_{}.txt'.format(args.mode,
+                                                                            key, args.dataset)),
+                      'a') as f:
+                f.write('Final result of classifier test (AUC / JSD):\n'+\
+                        '{:.4f} / {:.4f}\n\n'.format(eval_auc, eval_JSD))
 
 
 
@@ -910,6 +915,11 @@ def main(raw_args=None):
         print("Plotting histograms: DONE. \n")
 
     if args.mode in ['all', 'cls-low', 'cls-high', 'cls-low-normed']:
+        if args.mode in ['all', 'all-cls']:
+            list_cls = ['cls-low', 'cls-high']
+        else:
+            list_cls = [args.mode]
+
         print("Calculating high-level features for classifier ...")
         
         print("Using {} as cut for the showers ...".format(args.cut))
@@ -925,72 +935,72 @@ def main(raw_args=None):
             #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
         print("Calculating high-level features for classifer: DONE.\n")
+        for key in list_cls:
+            if (args.mode in ['cls-low']) or (key in ['cls-low']):
+                source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
+                                                               normed=False, single_energy=args.energy)
+                reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                  normed=False, single_energy=args.energy)
+            elif (args.mode in ['cls-low-normed']) or (key in ['cls-low-normed']):
+                source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
+                                                               normed=True, single_energy=args.energy)
+                reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                  normed=True, single_energy=args.energy)
+            elif (args.mode in ['cls-high']) or (key in ['cls-high']):
+                source_array = prepare_high_data_for_classifier(shower, energy, hlf, 0., cut=cut, single_energy=args.energy)
+                reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
+                                                                    single_energy=args.energy)
 
-        if args.mode in ['all', 'cls-low']:
-            source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
-                                                           normed=False, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                              normed=False, single_energy=args.energy)
-        elif args.mode in ['cls-low-normed']:
-            source_array = prepare_low_data_for_classifier(shower, energy, hlf, 0., cut=cut,
-                                                           normed=True, single_energy=args.energy)
-            reference_array = prepare_low_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                              normed=True, single_energy=args.energy)
-        elif args.mode in ['cls-high']:
-            source_array = prepare_high_data_for_classifier(shower, energy, hlf, 0., cut=cut, single_energy=args.energy)
-            reference_array = prepare_high_data_for_classifier(reference_shower, reference_energy, reference_hlf, 1., cut=cut,
-                                                                single_energy=args.energy)
+            train_data, test_data, val_data = ttv_split(source_array, reference_array)
 
-        train_data, test_data, val_data = ttv_split(source_array, reference_array)
+            # set up device
+            args.device = torch.device('cuda:'+str(args.which_cuda) \
+                                       if torch.cuda.is_available() and not args.no_cuda else 'cpu')
+            print("Using {}".format(args.device))
 
-        # set up device
-        args.device = torch.device('cuda:'+str(args.which_cuda) \
-                                   if torch.cuda.is_available() and not args.no_cuda else 'cpu')
-        print("Using {}".format(args.device))
+            # set up DNN classifier
+            input_dim = train_data.shape[1]-1
+            DNN_kwargs = {'num_layer':args.cls_n_layer,
+                          'num_hidden':args.cls_n_hidden,
+                          'input_dim':input_dim,
+                          'dropout_probability':args.cls_dropout_probability}
+            classifier = DNN(**DNN_kwargs)
+            classifier.to(args.device)
+            print(classifier)
+            total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
 
-        # set up DNN classifier
-        input_dim = train_data.shape[1]-1
-        DNN_kwargs = {'num_layer':args.cls_n_layer,
-                      'num_hidden':args.cls_n_hidden,
-                      'input_dim':input_dim,
-                      'dropout_probability':args.cls_dropout_probability}
-        classifier = DNN(**DNN_kwargs)
-        classifier.to(args.device)
-        print(classifier)
-        total_parameters = sum(p.numel() for p in classifier.parameters() if p.requires_grad)
+            print("{} has {} parameters".format(args.mode, int(total_parameters)))
 
-        print("{} has {} parameters".format(args.mode, int(total_parameters)))
+            optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
 
-        optimizer = torch.optim.Adam(classifier.parameters(), lr=args.cls_lr)
+            if args.save_mem:
+                train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()))
+                test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()))
+                val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()))
+            else:
+                train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device))
+                test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device))
+                val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device))
 
-        if args.save_mem:
-            train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()))
-            test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()))
-            val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()))
-        else:
-            train_data = TensorDataset(torch.tensor(train_data, dtype=torch.get_default_dtype()).to(args.device))
-            test_data = TensorDataset(torch.tensor(test_data, dtype=torch.get_default_dtype()).to(args.device))
-            val_data = TensorDataset(torch.tensor(val_data, dtype=torch.get_default_dtype()).to(args.device))
+            train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
+            test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
+            val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
 
-        train_dataloader = DataLoader(train_data, batch_size=args.cls_batch_size, shuffle=True)
-        test_dataloader = DataLoader(test_data, batch_size=args.cls_batch_size, shuffle=False)
-        val_dataloader = DataLoader(val_data, batch_size=args.cls_batch_size, shuffle=False)
+            train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
+            classifier = load_classifier(classifier, args)
 
-        train_and_evaluate_cls(classifier, train_dataloader, test_dataloader, optimizer, args)
-        classifier = load_classifier(classifier, args)
-
-        with torch.inference_mode():
-            print("Now looking at independent dataset:")
-            eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
-                                                        final_eval=True,
-                                                        calibration_data=test_dataloader)
-        print("Final result of classifier test (AUC / JSD):")
-        print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
-        with open(os.path.join(args.output_dir, 'classifier_{}_{}.txt'.format(args.mode,
-                                                                              args.dataset)),
-                  'a') as f:
-            f.write('Final result of classifier test (AUC / JSD):\n'+\
-                    '{:.4f} / {:.4f}\n\n'.format(eval_auc, eval_JSD))
+            with torch.inference_mode():
+                print("Now looking at independent dataset:")
+                eval_acc, eval_auc, eval_JSD = evaluate_cls(classifier, val_dataloader, args,
+                                                            final_eval=True,
+                                                            calibration_data=test_dataloader)
+            print("Final result of classifier test (AUC / JSD):")
+            print("{:.4f} / {:.4f}".format(eval_auc, eval_JSD))
+            with open(os.path.join(args.output_dir, 'classifier_{}_{}_{}.txt'.format(args.mode,
+                                                                            key, args.dataset)),
+                      'a') as f:
+                f.write('Final result of classifier test (AUC / JSD):\n'+\
+                        '{:.4f} / {:.4f}\n\n'.format(eval_auc, eval_JSD))
 
 
 if __name__ == '__main__':
