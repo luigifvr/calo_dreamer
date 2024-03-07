@@ -120,6 +120,21 @@ class LogEnergy(object):
                 transformed = torch.log(energy + self.alpha)
             return shower, transformed              
 
+class ScaleVoxels(object):
+    """
+    Apply a multiplicative factor to the voxels.
+        factor: Number to multiply voxels
+    """
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = shower/self.factor
+        else:
+            transformed = shower*self.factor
+        return transformed, energy
+    
 class ScaleEnergy(object):
     """
     Scale incident energies to lie in the range [0, 1]
@@ -207,11 +222,11 @@ class ExclusiveLogitTransform(object):
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = torch.special.expit(shower)
-            #transformed = logit_trafo(shower, alpha=self.delta, inv=True)
+            # transformed = torch.special.expit(shower)
+            transformed = logit_trafo(shower, alpha=self.delta, inv=True)
         else:
-            transformed = torch.special.logit(shower, eps=self.delta)
-            #transformed = logit_trafo(shower, alpha=self.delta, inv=False)
+            # transformed = torch.special.logit(shower, eps=self.delta)
+            transformed = logit_trafo(shower, alpha=self.delta, inv=False)
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy
