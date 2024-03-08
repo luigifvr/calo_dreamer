@@ -45,10 +45,7 @@ class ViT(nn.Module):
             f"Input radial bin count ({R}) should be divisible by patch size ({self.patch_shape[2]})."
         assert not self.hidden_dim % 6, "Hidden dim should be divisible by 6 (for fourier position embeddings)"
         
-        self.patch_shape = list(self.patch_shape)
-        self.num_patches = [
-            s // p for s, p in zip(self.shape[1:], self.patch_shape)
-        ]
+        self.num_patches = [s // p for s, p in zip([L, A, R], self.patch_shape)]
 
         # initialize x,t,c embeddings
         patch_dim = math.prod(self.patch_shape) * C
@@ -67,12 +64,12 @@ class ViT(nn.Module):
         )
         
         # compute fixed position embedding
-        self.pos_embed = nn.Parameter(
+        self.register_buffer(
+            'pos_embed',
             self.get_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
             if self.pos_embedding_coords == 'cylindrical' else
             self.get_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cartesian' else None,
-            requires_grad=False
+            if self.pos_embedding_coords == 'cartesian' else None
         )
 
         # # compute layer-causal attention mask
@@ -94,9 +91,7 @@ class ViT(nn.Module):
         ])
 
         # initialize output layer
-        self.final_layer = FinalLayer(
-            self.hidden_dim, self.patch_shape, C
-        )
+        self.final_layer = FinalLayer(self.hidden_dim, self.patch_shape, C)
 
         # custom weight initialization
         self.initialize_weights()

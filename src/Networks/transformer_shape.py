@@ -1,13 +1,11 @@
 import math
-from typing import Type, Callable, Union, Optional
+from typing import Optional
 import torch
 import torch.nn as nn
 from torchdiffeq import odeint
+from einops.layers.torch import Rearrange
 from .unet import UNet
-from .vblinear import VBLinear
 from .vit import ViT
-import numpy as np
-from einops import rearrange
 
 class ARtransformer_shape(nn.Module):
 
@@ -40,31 +38,45 @@ class ARtransformer_shape(nn.Module):
             batch_first=True,
         )
         if self.x_embed:
-            self.x_embed = nn.Sequential(nn.Linear(1, self.dim_embedding),
-                                     nn.Linear(self.dim_embedding, self.dim_embedding))
+            inch = self.shape[1]
+            ouch = params.get('x_embed_channels', 3)
+            kernel = params.get('x_embed_kernel', (4,2))
+            stride = params.get('x_embed_stride', (2,2))
+            intermediate_dim = ouch * math.prod([
+                1 + (l-k)//s for l, k, s in zip(self.shape[-2:], kernel, stride)
+            ])
+            self.x_embed = nn.Sequential(
+                nn.Flatten(0, 1),
+                nn.Conv2d(inch, ouch, kernel, stride),
+                Rearrange('(b l) c x y -> b l (c x y)', l=self.n_energy_layers),
+                nn.SiLU(),
+                nn.Linear(intermediate_dim, self.dim_embedding),
+            )
         if self.c_embed:
-            self.c_embed = nn.Sequential(nn.Linear(1, self.dim_embedding), nn.SiLU(),
-                                               nn.Linear(self.dim_embedding, self.dim_embedding))
-        self.t_embed = nn.Sequential(GaussianFourierProjection(embed_dim=self.encode_t_dim,
-                                                                     scale=self.encode_t_scale),
-                                           nn.Linear(self.encode_t_dim, self.encode_t_dim))
-
+            self.c_embed = nn.Sequential(
+                nn.Linear(1, self.dim_embedding),
+                nn.SiLU(),
+                nn.Linear(self.dim_embedding, self.dim_embedding)
+            )
+        self.t_embed = nn.Sequential(
+            GaussianFourierProjection(embed_dim=self.encode_t_dim, scale=self.encode_t_scale),
+            nn.Linear(self.encode_t_dim, self.encode_t_dim)
+        )
         self.subnet = self.build_subnet()
-        self.positional_encoding = PositionalEncoding(d_model=self.dim_embedding,
-                                                      max_len=max(self.dims_in, self.dims_c) + 1,
-                                                      dropout=0.0)
+        self.positional_encoding = PositionalEncoding(
+            d_model=self.dim_embedding, max_len=max(self.dims_in, self.dims_c) + 1, dropout=0.0
+        )
+
     def compute_embedding(
-        self, p: torch.Tensor,
-            dim: int,
-            embedding_net: Optional[nn.Module]
+        self, p: torch.Tensor, dim: int, embedding_net: Optional[nn.Module]
     ) -> torch.Tensor:
         """
         Appends the one-hot encoded position to the momenta p. Then this is either zero-padded
         or an embedding net is used to compute the embedding of the correct dimension.
         """
-        one_hot = torch.eye(dim, device=p.device, dtype=p.dtype)[
-            None, : p.shape[1], :
-        ].expand(p.shape[0], -1, -1)
+        one_hot = torch.eye(
+            dim, device=p.device, dtype=p.dtype
+        )[None, : p.shape[1], :].expand(p.shape[0], -1, -1)
         if embedding_net is None:
             n_rest = self.dim_embedding - dim - p.shape[-1]
             assert n_rest >= 0
@@ -82,8 +94,7 @@ class ARtransformer_shape(nn.Module):
         if subnet_class == 'ViT':
             return ViT(subnet_params)
 
-    def sample_dimension(
-            self, c: torch.Tensor):
+    def sample_dimension(self, c: torch.Tensor):
 
         batch_size = c.size(0)
         dtype = c.dtype
@@ -93,7 +104,6 @@ class ARtransformer_shape(nn.Module):
 
         # NN wrapper to pass into ODE solver
         def net_wrapper(t, x_t):
-            #t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype, device=device)
             t_torch = t * torch.ones((batch_size, 1), dtype=dtype, device=device)
             v = self.subnet(x_t, t_torch, c.flatten(0,1))
             return v
@@ -101,9 +111,7 @@ class ARtransformer_shape(nn.Module):
         # Solve ODE from t=1 to t=0
         with torch.inference_mode():
             x_t = odeint(
-                net_wrapper,
-                x_0,
-                torch.tensor([0, 1], dtype=dtype, device=device),
+                net_wrapper, x_0,torch.tensor([0, 1], dtype=dtype, device=device),
                 **self.params.get("solver_kwargs", {})
             )
         # Extract generated samples and mask out masses if not needed
@@ -113,8 +121,10 @@ class ARtransformer_shape(nn.Module):
 
     def forward(self, c, x_t=None, t=None, x=None, rev=False):
         if not rev:
-            x = x.flatten(2) # b l c x y -> b l (c x y)
-            xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
+
+            if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
+            # xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
+            xp = x
             embedding = self.transformer(
                 src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                 tgt=self.compute_embedding(
@@ -133,7 +143,7 @@ class ARtransformer_shape(nn.Module):
             x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
             c_embed = self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.n_energy_layers):
-                x = x.flatten(2) # b l c x y -> b l (c x y)
+                if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
                     src=c_embed,
                     tgt=self.compute_embedding(
