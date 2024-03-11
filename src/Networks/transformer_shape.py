@@ -2,6 +2,7 @@ import math
 from typing import Optional
 import torch
 import torch.nn as nn
+import numpy as np
 from torchdiffeq import odeint
 from einops.layers.torch import Rearrange
 from .unet import UNet
@@ -46,9 +47,9 @@ class ARtransformer_shape(nn.Module):
                 1 + (l-k)//s for l, k, s in zip(self.shape[-2:], kernel, stride)
             ])
             self.x_embed = nn.Sequential(
-                nn.Flatten(0, 1),
+                nn.Flatten(0, 1), # b l c x y -> (b l) c x y
                 nn.Conv2d(inch, ouch, kernel, stride),
-                Rearrange('(b l) c x y -> b l (c x y)', l=self.n_energy_layers),
+                nn.Flatten(1), # (b l) c x y -> (b l) (c x y)
                 nn.SiLU(),
                 nn.Linear(intermediate_dim, self.dim_embedding),
             )
@@ -83,7 +84,8 @@ class ARtransformer_shape(nn.Module):
             zeros = torch.zeros((*p.shape[:2], n_rest), device=p.device, dtype=p.dtype)
             return torch.cat((p, one_hot, zeros), dim=2)
         else:
-            return self.positional_encoding(embedding_net(p))
+            embedding = embedding_net(p).unflatten(0, (len(p), -1)) # (b l) (c x y) -> b l (c x y)
+            return self.positional_encoding(embedding)
 
     def build_subnet(self):
         subnet_config = self.params.get('subnet', 'UNet') 
@@ -123,29 +125,29 @@ class ARtransformer_shape(nn.Module):
         if not rev:
 
             if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
-            # xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
-            xp = x
+            # xp = x
+            xp = nn.functional.pad(x[:, :-1], (0, 0, 0, 0, 0, 0, 1, 0))
             embedding = self.transformer(
                 src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                 tgt=self.compute_embedding(
                     xp, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
                 ),
                 tgt_mask=torch.ones(
-                    (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
+                    (xp.size(1), xp.size(1)), device=x.device, dtype=torch.bool
                 ).triu(diagonal=1),
             )
-            
+
             x_t = x_t.flatten(0,1) # b l c x y -> (b l) c x y
-            pred = self.subnet(x_t, t.reshape((-1, 1)), embedding.flatten(0,1))
+            embedding = embedding.flatten(0,1)
+            pred = self.subnet(x_t, t.reshape((-1, 1)), embedding)
             pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
         else:
             x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
-            c_embed = self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed)
-            for i in range(self.n_energy_layers):
+            for _ in range(self.n_energy_layers):
                 if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
-                    src=c_embed,
+                    src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                     tgt=self.compute_embedding(
                         x, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
                     ),
@@ -154,7 +156,7 @@ class ARtransformer_shape(nn.Module):
                     ).triu(diagonal=1),
                 )
                 x_new = self.sample_dimension(embedding[:, -1:,:])
-                x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
+                if self.x_embed is None: x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]
