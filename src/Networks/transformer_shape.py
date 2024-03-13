@@ -38,7 +38,7 @@ class ARtransformer_shape(nn.Module):
             # activation=params.get("activation", "relu"),
             batch_first=True,
         )
-        if self.x_embed:
+        if self.x_embed == 'conv':
             inch = self.shape[1]
             ouch = params.get('x_embed_channels', 3)
             kernel = params.get('x_embed_kernel', (4,2))
@@ -46,7 +46,7 @@ class ARtransformer_shape(nn.Module):
             intermediate_dim = ouch * math.prod([
                 1 + (l-k)//s for l, k, s in zip(self.shape[-2:], kernel, stride)
             ])
-            self.x_embed = nn.Sequential(
+            self.x_embed_net = nn.Sequential(
                 nn.Flatten(0, 1), # b l c x y -> (b l) c x y
                 nn.Conv2d(inch, ouch, kernel, stride),
                 nn.Flatten(1), # (b l) c x y -> (b l) (c x y)
@@ -60,6 +60,11 @@ class ARtransformer_shape(nn.Module):
             #     # nn.SiLU(),
             #     nn.Linear(intermediate_dim//ouch, self.dim_embedding),
             # )                   
+        elif self.x_embed == 'linear':
+            self.x_embed_net = nn.Linear(self.dims_in, self.dim_embedding)
+        else:
+            self.x_embed_net = None
+
         if self.c_embed:
             self.c_embed = nn.Sequential(
                 nn.Linear(1, self.dim_embedding),
@@ -91,7 +96,11 @@ class ARtransformer_shape(nn.Module):
             zeros = torch.zeros((*p.shape[:2], n_rest), device=p.device, dtype=p.dtype)
             return torch.cat((p, one_hot, zeros), dim=2)
         else:
-            embedding = embedding_net(p).unflatten(0, (len(p), -1)) # (b l) (c x y) -> b l (c x y)
+            embedding = embedding_net(p)
+            if self.x_embed == 'conv':
+                # Unflatten only required for conv x embed
+                # But, unflattening must be dynamic since length changes during sampling
+                embedding = embedding.unflatten(0, (len(p), -1)) # (b l) (c x y) -> b l (c x y)
             return self.positional_encoding(embedding)
 
     def build_subnet(self):
@@ -131,13 +140,17 @@ class ARtransformer_shape(nn.Module):
     def forward(self, c, x_t=None, t=None, x=None, rev=False):
         if not rev:
 
-            if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
+            if self.x_embed == 'conv':
+                xp = nn.functional.pad(x[:, :-1], (0, 0, 0, 0, 0, 0, 1, 0))
+            else:
+                x = x.flatten(2) # b l c x y -> b l (c x y)
+                xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             # xp = x
-            xp = nn.functional.pad(x[:, :-1], (0, 0, 0, 0, 0, 0, 1, 0))
+
             embedding = self.transformer(
                 src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                 tgt=self.compute_embedding(
-                    xp, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
+                    xp, dim=self.n_energy_layers+1, embedding_net=self.x_embed_net,
                 ),
                 tgt_mask=torch.ones(
                     (xp.size(1), xp.size(1)), device=x.device, dtype=torch.bool
@@ -152,18 +165,18 @@ class ARtransformer_shape(nn.Module):
         else:
             x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
             for _ in range(self.n_energy_layers):
-                if self.x_embed is None: x = x.flatten(2) # b l c x y -> b l (c x y)
+                if self.x_embed != 'conv': x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
                     src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
                     tgt=self.compute_embedding(
-                        x, dim=self.n_energy_layers+1, embedding_net=self.x_embed,
+                        x, dim=self.n_energy_layers+1, embedding_net=self.x_embed_net,
                     ),
                     tgt_mask=torch.ones(
                         (x.size(1), x.size(1)), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
                 x_new = self.sample_dimension(embedding[:, -1:,:])
-                if self.x_embed is None: x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
+                if self.x_embed != 'conv': x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]

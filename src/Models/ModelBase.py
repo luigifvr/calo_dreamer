@@ -200,7 +200,7 @@ class GenerativeModel(nn.Module):
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
                 if (self.epoch + 1) % get(self.params,"save_every",10) == 0 or self.epoch==0:
-                    self.save(epoch=f"self.epoch")
+                    self.save(epoch=f"{self.epoch}")
 
             # estimate training time
             if e==0:
