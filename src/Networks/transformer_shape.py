@@ -53,6 +53,13 @@ class ARtransformer_shape(nn.Module):
                 nn.SiLU(),
                 nn.Linear(intermediate_dim, self.dim_embedding),
             )
+            # self.x_embed = nn.Sequential(
+            #     nn.Flatten(0, 1), # b l c x y -> (b l) c x y
+            #     nn.MaxPool2d(kernel, stride),
+            #     nn.Flatten(1), # (b l) c x y -> (b l) (c x y)
+            #     # nn.SiLU(),
+            #     nn.Linear(intermediate_dim//ouch, self.dim_embedding),
+            # )                   
         if self.c_embed:
             self.c_embed = nn.Sequential(
                 nn.Linear(1, self.dim_embedding),
