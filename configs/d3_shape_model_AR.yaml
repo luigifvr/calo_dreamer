@@ -42,25 +42,23 @@ model_type: shape
 model: TransfusionAR
 network: ARtransformer_shape
 condition_dim: 46
-dim_embedding: 512
+dim_embedding: 256
 n_head: 4
 n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
-dropout_transformer: 0.0
 normalization: LayerNorm
 # dropout_transformer: 0.05
-# x_embed: linear
 x_embed: conv
 x_embed_kernel: [4,2]
 x_embed_stride: [2,2]
-x_embed_channels: 3
+x_embed_channels: 2
 subnet:
     class: UNet
     params:
         dim: 2
         cylindrical: True
-        condition_dim: 512 # match dim_embedding
+        condition_dim: 256 # match dim_embedding
         level_channels: [64, 64, 128]
         level_kernels: [[7,3], [4,2]]
         level_strides: [[5,3], [2,2]]  # (50, 18) -> (10, 6) -> (5, 3)
@@ -77,12 +75,12 @@ energy_model: /remote/gpu06/favaro/temp/calodream_models/d2_energy_model_AR
 
 # Training
 lr: 1.e-3
-max_lr: 1.e-4
-batch_size: 250
+max_lr: 5.e-4
+batch_size: 300
 validate_every: 5
 use_scheduler: True
 lr_scheduler: one_cycle_lr
-weight_decay: 0.001
+weight_decay: 0.01
 betas: [0.9, 0.999]
 n_epochs: 500
 cycle_epochs: 500

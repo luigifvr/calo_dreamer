@@ -30,6 +30,7 @@ class ARtransformer_shape(nn.Module):
 
         self.encode_t_dim = self.params.get("encode_t_dim", 64)
         self.encode_t_scale = self.params.get("encode_t_scale", 30)
+        self.layer_cond = self.params.get("layer_cond", False)
 
         self.transformer = nn.Transformer(
             d_model=self.dim_embedding,
@@ -170,7 +171,7 @@ class ARtransformer_shape(nn.Module):
             
         else:
             x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
-            for _ in range(self.n_energy_layers):
+            for i in range(self.n_energy_layers):
                 if self.x_embed != 'conv': x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
                     src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
