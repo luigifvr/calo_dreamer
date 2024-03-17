@@ -2,8 +2,10 @@ import math
 from typing import Optional
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from torchdiffeq import odeint
+from einops import repeat
 from einops.layers.torch import Rearrange
 from .unet import UNet
 from .vit import ViT
@@ -21,6 +23,7 @@ class ARtransformer_shape(nn.Module):
         self.dims_in = self.shape[2] * self.shape[3] # X*Y
         self.dims_c = self.params["condition_dim"]
         self.bayesian = False
+        self.layer_cond = self.params.get("layer_cond", False)
 
         self.c_embed = self.params.get("c_embed", None)
         self.x_embed = self.params.get("x_embed", None)
@@ -159,6 +162,9 @@ class ARtransformer_shape(nn.Module):
 
             x_t = x_t.flatten(0,1) # b l c x y -> (b l) c x y
             embedding = embedding.flatten(0,1)
+            if self.layer_cond:
+                layer_one_hot = torch.eye(self.n_energy_layers, device=x.device).repeat(len(t), 1)
+                embedding = torch.cat([embedding, layer_one_hot], dim=1)            
             pred = self.subnet(x_t, t.reshape((-1, 1)), embedding)
             pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
@@ -175,6 +181,12 @@ class ARtransformer_shape(nn.Module):
                         (x.size(1), x.size(1)), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
+                if self.layer_cond:
+                    layer_one_hot = repeat(
+                        F.one_hot(torch.tensor(i, device=x.device), self.n_energy_layers),
+                        'd -> b 1 d', b=len(c)
+                    )
+                    embedding = torch.cat([embedding[:, -1:,:], layer_one_hot], dim=2)
                 x_new = self.sample_dimension(embedding[:, -1:,:])
                 if self.x_embed != 'conv': x = x.unflatten(2, self.shape[1:]) # b l (c x y) -> b l c x y
                 x = torch.cat((x, x_new), dim=1)

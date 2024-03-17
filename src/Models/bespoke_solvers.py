@@ -258,7 +258,7 @@ class BespokeSolver(nn.Module):
         for i, c in enumerate(cond_generator):
             
             # standard forward/backward passes
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
             loss = self.forward(c).mean()
             loss.backward()
             self.optimizer.step()

@@ -281,7 +281,7 @@ def train_cls(model, data_train, optim, epoch, arg):
         #weight = s_output_vector/(1-s_output_vector)
         #print(weight.median())
 
-        optim.zero_grad()
+        optim.zero_grad(set_to_none=True)
         loss.backward()
         optim.step()
 
@@ -530,7 +530,7 @@ def run_from_py(sample, energy, doc, params):
                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
     hlf = HLF.HighLevelFeatures(particle,
-                                filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                     args.dataset.replace('-', '_')))
     
     #Checking for negative values, nans and infinities
@@ -559,7 +559,7 @@ def run_from_py(sample, energy, doc, params):
     )
     reference_shower[reference_shower<args.cut] = 0.0
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
 
@@ -768,7 +768,7 @@ def main(raw_args=None):
                         '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
         hlf = HLF.HighLevelFeatures(
-            particle, filename='src/challenge_files/binning_dataset_{}.xml'.format(
+            particle, filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                         args.dataset.replace('-', '_'))
         )
         shower, energy = extract_shower_and_energy(source_file, which='input', single_energy=args.energy)
@@ -805,7 +805,7 @@ def main(raw_args=None):
     #else:
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(particle,
-                                              filename='/remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
+                                              filename='/home/aore/calo_dreamer/src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
     reference_hlf.Einc = reference_energy
     #save_reference(reference_hlf,
