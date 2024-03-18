@@ -33,7 +33,7 @@ class TransfusionAR(GenerativeModel):
         if distribution == "uniform":
             self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
         elif distribution == "beta":
-            self.distribution = torch.distributions.beta.Beta(torch.tensor([1.5]), torch.tensor([1.5]))
+            self.distribution = torch.distributions.beta.Beta(1.5, 1.5)
         else:
             raise NotImplementedError(f"build_model: Distribution type {distribution} not implemented")
 
@@ -85,7 +85,7 @@ class TransfusionAR(GenerativeModel):
 
         # Sample time steps
         t = self.distribution.sample(
-            list(x.shape[:2]) + [1]*(x.ndim-3)).to(dtype=x.dtype, device=x.device)
+            list(x.shape[:2]) + [1]*(x.ndim-2)).to(dtype=x.dtype, device=x.device)
 
         # Sample noise variables
         x_0 = torch.randn(x.shape, dtype=x.dtype, device=x.device)

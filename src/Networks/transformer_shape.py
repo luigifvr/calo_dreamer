@@ -8,7 +8,7 @@ from einops import repeat
 from torchdiffeq import odeint
 from typing import Optional
 from .unet import UNet
-from .vit import ViT2D
+from .vit import ViT
 
 class ARtransformer_shape(nn.Module):
 
@@ -111,12 +111,14 @@ class ARtransformer_shape(nn.Module):
         subnet_config = self.params.get('subnet', 'UNet') 
         subnet_class = subnet_config['class']
         subnet_params = subnet_config['params']
+        condition_dim = self.dim_embedding + int(self.layer_cond)*self.dims_c
         if subnet_class == 'UNet':
-            subnet_params["condition_dim"] = self.dim_embedding
+            subnet_params['condition_dim'] = condition_dim
             return UNet(subnet_params)
         if subnet_class == 'ViT':
-            subnet_params['hidden_dim'] = self.dim_embedding
-            return ViT2D(subnet_params)
+            subnet_params['shape'] = self.shape[1:]
+            subnet_params['condition_dim'] = condition_dim
+            return ViT(subnet_params)
 
     def sample_dimension(self, c: torch.Tensor):
 
@@ -167,7 +169,7 @@ class ARtransformer_shape(nn.Module):
             embedding = embedding.flatten(0,1)
             if self.layer_cond:
                 layer_one_hot = torch.eye(self.n_energy_layers, device=x.device).repeat(len(t), 1)
-                embedding = torch.cat([embedding, layer_one_hot], dim=1)            
+                embedding = torch.cat([embedding, layer_one_hot], dim=1)
             pred = self.subnet(x_t, t.reshape((-1, 1)), embedding)
             pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
