@@ -200,7 +200,7 @@ class GenerativeModel(nn.Module):
             # save model periodically, useful when trying to understand how weights are learned over iterations
             if get(self.params,"save_periodically",False):
                 if (self.epoch + 1) % get(self.params,"save_every",10) == 0 or self.epoch==0:
-                    self.save(epoch=f"self.epoch")
+                    self.save(epoch=f"{self.epoch}")
 
             # estimate training time
             if e==0:
@@ -233,13 +233,18 @@ class GenerativeModel(nn.Module):
         # iterate batch wise over input
         for batch_id, x in enumerate(self.train_loader):
 
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad(set_to_none=True)
 
             # calculate batch loss
             loss = self.batch_loss(x)
 
             if np.isfinite(loss.item()): # and (abs(loss.item() - loss_m) / loss_s < 5 or len(self.train_losses_epoch) == 0):
                 loss.backward()
+
+                clip = self.params.get('clip_gradients_to', None)
+                if clip:
+                    nn.utils.clip_grad_norm_(self.net.parameters(), clip)
+
                 self.optimizer.step()
                 train_losses = np.append(train_losses, loss.item())
                 # if self.log:

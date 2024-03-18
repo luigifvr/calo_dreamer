@@ -6,8 +6,7 @@ import torch.nn as nn
 
 from einops import rearrange
 from einops.layers.torch import Rearrange
-from timm.models.vision_transformer import Attention, Mlp
-# from timm.models.vision_transformer import Mlp
+from timm.models.vision_transformer import Mlp
 
 class ViT(nn.Module):
     """
@@ -30,7 +29,8 @@ class ViT(nn.Module):
             'mlp_ratio': 4.0,
             'attn_drop': 0.,
             'proj_drop': 0.,
-            'pos_embedding_coords': 'cartesian'
+            'pos_embedding_coords': 'cartesian',
+            'causal_attn': False,
         }
 
         for k, p in defaults.items():
@@ -45,10 +45,7 @@ class ViT(nn.Module):
             f"Input radial bin count ({R}) should be divisible by patch size ({self.patch_shape[2]})."
         assert not self.hidden_dim % 6, "Hidden dim should be divisible by 6 (for fourier position embeddings)"
         
-        self.patch_shape = list(self.patch_shape)
-        self.num_patches = [
-            s // p for s, p in zip(self.shape[1:], self.patch_shape)
-        ]
+        self.num_patches = [s // p for s, p in zip([L, A, R], self.patch_shape)]
 
         # initialize x,t,c embeddings
         patch_dim = math.prod(self.patch_shape) * C
@@ -67,36 +64,39 @@ class ViT(nn.Module):
         )
         
         # compute fixed position embedding
-        self.pos_embed = nn.Parameter(
+        self.register_buffer(
+            'pos_embed',
             self.get_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
             if self.pos_embedding_coords == 'cylindrical' else
             self.get_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cartesian' else None,
-            requires_grad=False
+            if self.pos_embedding_coords == 'cartesian' else None
         )
 
-        # # compute layer-causal attention mask
-        # l, a, r = self.num_patches
-        # patch_idcs = torch.arange(l*a*r)
-        # attn_mask = nn.Parameter(
-        #     patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # causal
-        #     # patch_idcs[:,None]//(a*r) <= patch_idcs[None,:]//(a*r), # non-causal
-        #     requires_grad=False
-        # )
+        # compute layer-causal attention mask
+        if self.causal_attn:
+            l, a, r = self.num_patches
+            patch_idcs = torch.arange(l*a*r)
+            # self.register_buffer('attn_mask',
+            #     # patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # tril (causal)
+            #     patch_idcs[:,None]//(a*r) <= patch_idcs[None,:]//(a*r), # triu (non-causal)
+            # )
+            self.attn_mask = nn.Parameter(
+                patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # tril (causal)
+                # patch_idcs[:,None]//(a*r) <= patch_idcs[None,:]//(a*r), # triu (non-causal)
+                requires_grad=False
+            )
 
         # initialize transformer stack
         self.blocks = nn.ModuleList([
             DiTBlock(
                 self.hidden_dim, self.num_heads, mlp_ratio=self.mlp_ratio,
                 attn_drop=self.attn_drop, proj_drop=self.proj_drop,
-                # attn_mask=attn_mask
+                attn_mask=self.attn_mask if self.causal_attn else None
             ) for _ in range(self.depth)
         ])
 
         # initialize output layer
-        self.final_layer = FinalLayer(
-            self.hidden_dim, self.patch_shape, C
-        )
+        self.final_layer = FinalLayer(self.hidden_dim, self.patch_shape, C)
 
         # custom weight initialization
         self.initialize_weights()
@@ -460,43 +460,43 @@ class TimestepEmbedder(nn.Module):
         t_emb = self.mlp(t_freq)
         return t_emb
 
-# class Attention(nn.Module):
+class Attention(nn.Module):
     
-#     def __init__(
-#             self,
-#             dim: int,
-#             num_heads: int = 8,
-#             qkv_bias: bool = False,
-#             qk_norm: bool = False,
-#             attn_drop: float = 0.,
-#             proj_drop: float = 0.,
-#             attn_mask: torch.Tensor = None,
-#             norm_layer: nn.Module = nn.LayerNorm,
-#     ) -> None:
-#         super().__init__()
-#         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
-#         self.num_heads = num_heads
-#         self.head_dim = dim // num_heads
-#         self.scale = self.head_dim ** -0.5
+    def __init__(
+            self,
+            dim: int,
+            num_heads: int = 8,
+            qkv_bias: bool = False,
+            qk_norm: bool = False,
+            attn_drop: float = 0.,
+            proj_drop: float = 0.,
+            attn_mask: torch.Tensor = None,
+            norm_layer: nn.Module = nn.LayerNorm,
+    ) -> None:
+        super().__init__()
+        assert dim % num_heads == 0, 'dim should be divisible by num_heads'
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
 
-#         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-#         self.q_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
-#         self.k_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
-#         self.attn_drop = nn.Dropout(attn_drop)
-#         self.proj = nn.Linear(dim, dim)
-#         self.proj_drop = nn.Dropout(proj_drop)
-#         self.attn_mask = attn_mask
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.q_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
+        self.k_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+        self.attn_mask = attn_mask
 
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         B, N, C = x.shape
-#         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
-#         q, k, v = qkv.unbind(0)
-#         q, k = self.q_norm(q), self.k_norm(k)
-#         x = nn.functional.scaled_dot_product_attention(
-#             q, k, v, attn_mask=self.attn_mask,
-#             dropout_p=self.attn_drop.p if self.training else 0.,
-#         )
-#         x = x.transpose(1, 2).reshape(B, N, C)
-#         x = self.proj(x)
-#         x = self.proj_drop(x)
-#         return x
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)
+        q, k = self.q_norm(q), self.k_norm(k)
+        x = nn.functional.scaled_dot_product_attention(
+            q, k, v, attn_mask=self.attn_mask,
+            dropout_p=self.attn_drop.p if self.training else 0.,
+        )
+        x = x.transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
