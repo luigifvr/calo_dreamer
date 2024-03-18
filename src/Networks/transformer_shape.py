@@ -5,7 +5,7 @@ import torch.nn as nn
 from torchdiffeq import odeint
 from .unet import UNet
 from .vblinear import VBLinear
-from .vit import ViT
+from .vit import ViT2D
 import numpy as np
 from einops import rearrange
 
@@ -26,9 +26,6 @@ class ARtransformer_shape(nn.Module):
         self.c_embed = self.params.get("c_embed", None)
         self.x_embed = self.params.get("x_embed", None)
 
-        self.encode_t_dim = self.params.get("encode_t_dim", 64)
-        self.encode_t_scale = self.params.get("encode_t_scale", 30)
-
         self.transformer = nn.Transformer(
             d_model=self.dim_embedding,
             nhead=params["n_head"],
@@ -45,9 +42,6 @@ class ARtransformer_shape(nn.Module):
         if self.c_embed:
             self.c_embed = nn.Sequential(nn.Linear(1, self.dim_embedding), nn.SiLU(),
                                                nn.Linear(self.dim_embedding, self.dim_embedding))
-        self.t_embed = nn.Sequential(GaussianFourierProjection(embed_dim=self.encode_t_dim,
-                                                                     scale=self.encode_t_scale),
-                                           nn.Linear(self.encode_t_dim, self.encode_t_dim))
 
         self.subnet = self.build_subnet()
         self.positional_encoding = PositionalEncoding(d_model=self.dim_embedding,
@@ -78,9 +72,11 @@ class ARtransformer_shape(nn.Module):
         subnet_class = subnet_config['class']
         subnet_params = subnet_config['params']
         if subnet_class == 'UNet':
+            subnet_params["condition_dim"] = self.dim_embedding
             return UNet(subnet_params)
         if subnet_class == 'ViT':
-            return ViT(subnet_params)
+            subnet_params['hidden_dim'] = self.dim_embedding
+            return ViT2D(subnet_params)
 
     def sample_dimension(
             self, c: torch.Tensor):
@@ -95,7 +91,7 @@ class ARtransformer_shape(nn.Module):
         def net_wrapper(t, x_t):
             #t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype, device=device)
             t_torch = t * torch.ones((batch_size, 1), dtype=dtype, device=device)
-            v = self.subnet(x_t, t_torch, c.flatten(0,1))
+            v = self.subnet(x_t, t_torch, c)
             return v
 
         # Solve ODE from t=1 to t=0
@@ -126,7 +122,8 @@ class ARtransformer_shape(nn.Module):
             )
             
             x_t = x_t.flatten(0,1) # b l c x y -> (b l) c x y
-            pred = self.subnet(x_t, t.reshape((-1, 1)), embedding.flatten(0,1))
+            t = t.flatten(2)
+            pred = self.subnet(x_t, t, embedding)
             pred = pred.unflatten(0, (-1, self.n_energy_layers)) # (b l) c x y -> b l c x y
             
         else:
