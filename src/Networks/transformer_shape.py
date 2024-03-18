@@ -90,7 +90,7 @@ class ARtransformer_shape(nn.Module):
         # NN wrapper to pass into ODE solver
         def net_wrapper(t, x_t):
             #t_torch = t * torch.ones_like(x_t[:, [0]], dtype=dtype, device=device)
-            t_torch = t * torch.ones((batch_size, 1), dtype=dtype, device=device)
+            t_torch = t * torch.ones((batch_size, 1, 1), dtype=dtype, device=device)
             v = self.subnet(x_t, t_torch, c)
             return v
 
