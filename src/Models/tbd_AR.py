@@ -29,7 +29,13 @@ class TransfusionAR(GenerativeModel):
 
         self.t_min = get(self.params, "t_min", 0)
         self.t_max = get(self.params, "t_max", 1)
-        self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
+        distribution = get(self.params, "distribution", "uniform")
+        if distribution == "uniform":
+            self.distribution = torch.distributions.uniform.Uniform(low=self.t_min, high=self.t_max)
+        elif distribution == "beta":
+            self.distribution = torch.distributions.beta.Beta(torch.tensor([1.5]), torch.tensor([1.5]))
+        else:
+            raise NotImplementedError(f"build_model: Distribution type {distribution} not implemented")
 
     def build_net(self):
         """
@@ -64,26 +70,41 @@ class TransfusionAR(GenerativeModel):
             loss_terms: dictionary with loss contributions
         """
         x, c, _ = self.get_condition_and_input(input)
+
+        if self.latent: # encode x into autoencoder latent space
+            x = self.ae.encode(x, c)
+            if self.ae.kl:
+                x = self.ae.reparameterize(x[0], x[1])
+            x = self.ae.unflatten_layer_from_batch(x)
+        # else:
+        #     print(x.shape)
+        #     x = x.movedim(1,2)
+        #     print(x.shape)
+
+        # add phantom layer dim to condition
         c = c.unsqueeze(-1)
-        #t = self.distribution.sample(x.size(0),x.size(1) ,1).to(x.device)
-        # Calculate point and derivative on trajectory
+
         # Sample time steps
-        t = torch.rand((x.size(0), x.size(1), *([1]*(x.ndim - 2))), dtype=x.dtype, device=x.device)
+        t = self.distribution.sample(
+            list(x.shape[:2]) + [1]*(x.ndim-3)).to(dtype=x.dtype, device=x.device)
+
         # Sample noise variables
-        x_0 = torch.randn((x.size(0), *self.shape), dtype=x.dtype, device=x.device)
+        x_0 = torch.randn(x.shape, dtype=x.dtype, device=x.device)
+        # Calculate point and derivative on trajectory
         x_t, x_t_dot = self.trajectory(x_0, x, t)
-
-
         v_pred = self.net(c,x_t,t,x)
         # Mask out masses if not needed
         loss = ((v_pred - x_t_dot) ** 2).mean()
 
         return loss
 
+    @torch.inference_mode()
     def sample_batch(self,c):
-        c = c.unsqueeze(-1)
-        pred = self.net(c, rev=True)
-        return pred.detach().cpu().numpy()
+        sample = self.net(c.unsqueeze(-1), rev=True)
+        if self.latent: # decode the generated sample
+            sample, c = self.ae.flatten_layer_to_batch(sample, c)
+            sample = self.ae.decode(sample.squeeze(), c)
+        return sample
 
 def linear_trajectory(x_0, x_1, t):
     x_t = (1 - t) * x_0 + t * x_1
