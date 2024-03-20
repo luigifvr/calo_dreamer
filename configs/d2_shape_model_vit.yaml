@@ -1,23 +1,25 @@
-run_name: d2_vit_500
+run_name: d2_vit_341patch_grid_causal_1000e
 dtype: float32
 
 # Model
 model_type: shape
-energy_model: /remote/gpu02/ore/calo_dreamer/results/20240213_104847_d2_energy_model_ARtransformer
+energy_model: /home/aore/calo_dreamer/results/20231219_210403_d2_energy_model
+
 # Data
-hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_1.hdf5
-eval_hdf5_file: /remote/gpu06/favaro/datasets/calo_challenge/dataset_2_2.hdf5
-xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
 eval_dataset: "2"
 eval_cut: 15.15e-3
+eval_mode: all
 shape: [1, 45, 16, 9]
 
 transforms: {
     NormalizeByElayer: {
-        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
+        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml,
         xml_file: electron
     },
     SelectiveUniformNoise: {
@@ -39,15 +41,15 @@ transforms: {
 
 # Training
 lr: 1.e-3
-max_lr: 1.e-3
+# max_lr: 2.e-3
 batch_size: 250
 validate_every: 5
 use_scheduler: True
-lr_scheduler: one_cycle_lr
-weight_decay: 1.e-3
+lr_scheduler: CosineAnnealing
+# weight_decay: 1.e-3
 betas: [0.9, 0.999]
-n_epochs: 500
-cycle_epochs: 500
+n_epochs: 1000
+cycle_epochs: 1000
 cycle_pct_start: 0.1
 save_interval: 100_001
 
@@ -60,17 +62,12 @@ solver_kwargs: {method: rk4, options: {step_size: 0.02}}
 # Network
 network: ViT
 condition_dim: 46
-patch_shape: [5, 2, 1]
-hidden_dim: 480
+patch_shape: [3, 4, 1]
+hidden_dim: 96
 depth: 6
 num_heads: 6
 mlp_ratio: 4.0
-# attn_drop: 0.00
-# proj_drop: 0.05
-pos_embedding_coords: cartesian
-
-# patch_shape: [3, 2, 1]
-# hidden_dim: 480
-# depth: 8
-# num_heads: 8
-# mlp_ratio: 4.0
+pos_embedding_coords: cylindrical
+causal_attn: True
+attn_drop: 0.05
+proj_drop: 0.05

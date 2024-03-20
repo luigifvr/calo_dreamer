@@ -216,7 +216,7 @@ class ExclusiveLogitTransform(object):
         exclusions: list of indices for features that should not be transformed
     """
 
-    def __init__(self, delta, exclusions=None, rescale=True):
+    def __init__(self, delta, exclusions=None, rescale=False):
         self.delta = delta
         self.exclusions = exclusions
         self.rescale = rescale
