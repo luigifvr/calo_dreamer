@@ -31,6 +31,7 @@ class ViT(nn.Module):
             'attn_drop': 0.,
             'proj_drop': 0.,
             'pos_embedding_coords': 'cartesian',
+            'learn_pos_embed': False,
             'causal_attn': False,
         }
 
@@ -59,24 +60,31 @@ class ViT(nn.Module):
             nn.Linear(self.hidden_dim, self.hidden_dim),
         )
         
-        # compute fixed position embedding
         self.num_patches = [s // p for s, p in zip(axis_sizes, self.patch_shape)]
-        self.register_buffer(
-            'pos_embed',
-            get_2d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cylindrical' and self.dim == 2 else
-            get_2d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cartesian' and self.dim == 2 else            
-            get_3d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cylindrical' and self.dim == 3 else
-            get_3d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-            if self.pos_embedding_coords == 'cartesian' and self.dim == 3 else None
-        )
+        l, a, r = self.num_patches
+        
+        # initialize position embeddings
+        if self.learn_pos_embed:
+            self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim//2))
+            self.register_buffer('lgrid', torch.arange(l)/l)
+            self.register_buffer('agrid', torch.arange(a)/a)
+            self.register_buffer('rgrid', torch.arange(r)/r)
+        else:
+            self.register_buffer(
+                'pos_embed',
+                get_2d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
+                if self.pos_embedding_coords == 'cylindrical' and self.dim == 2 else
+                get_2d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
+                if self.pos_embedding_coords == 'cartesian' and self.dim == 2 else            
+                get_3d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
+                if self.pos_embedding_coords == 'cylindrical' and self.dim == 3 else
+                get_3d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
+                if self.pos_embedding_coords == 'cartesian' and self.dim == 3 else None
+            )
 
         # compute layer-causal attention mask
         if self.causal_attn:
             assert self.dim == 3, "A layer-causal attention mask should only be used in 3d"
-            l, a, r = self.num_patches
             patch_idcs = torch.arange(l*a*r)
             self.attn_mask = nn.Parameter(
                 patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # tril (causal)
@@ -97,6 +105,15 @@ class ViT(nn.Module):
 
         # custom weight initialization
         self.initialize_weights()
+
+    def learnable_pos_embedding(self):
+        wz, wy, wx = (self.pos_embed_freqs * 2 * math.pi).chunk(3)
+        z, y, x = torch.meshgrid(self.lgrid, self.agrid, self.rgrid, indexing='ij')
+        z = z.flatten()[:, None] * wz[None, :]
+        y = y.flatten()[:, None] * wy[None, :]
+        x = x.flatten()[:, None] * wx[None, :]
+        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
+        return pe
 
     def initialize_weights(self):
         # Initialize transformer layers:
@@ -130,7 +147,11 @@ class ViT(nn.Module):
         c: (B, K) tensor of conditions
         """
         x = self.to_patches(x)
-        x = self.x_embedder(x) + self.pos_embed  # (B, T, D), where T = prod(axis_sizes)/prod(patch_size)
+        if self.learn_pos_embed:
+            x = self.x_embedder(x) + self.learnable_pos_embedding()
+        else:
+            x = self.x_embedder(x) + self.pos_embed # (B, T, D), where T = (L*A*R)/prod(patch_size)
+
         t = self.t_embedder(t)                   # (B, D)
         c = self.c_embedder(c)                   # (B, D)
         c = t + c                                # (B, D)
