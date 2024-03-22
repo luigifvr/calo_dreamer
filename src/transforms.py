@@ -6,7 +6,7 @@ from challenge_files import *
 from challenge_files import XMLHandler
 from itertools import pairwise
 
-def logit_trafo(array, alpha=1.e-6, inv=False):
+def logit(array, alpha=1.e-6, inv=False):
     if inv:
         z = torch.sigmoid(array)
         z = (z-alpha)/(1-2*alpha)
@@ -120,6 +120,21 @@ class LogEnergy(object):
                 transformed = torch.log(energy + self.alpha)
             return shower, transformed              
 
+class ScaleVoxels(object):
+    """
+    Apply a multiplicative factor to the voxels.
+        factor: Number to multiply voxels
+    """
+    def __init__(self, factor):
+        self.factor = factor
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            transformed = shower/self.factor
+        else:
+            transformed = shower*self.factor
+        return transformed, energy
+    
 class ScaleEnergy(object):
     """
     Scale incident energies to lie in the range [0, 1]
@@ -201,17 +216,23 @@ class ExclusiveLogitTransform(object):
         exclusions: list of indices for features that should not be transformed
     """
 
-    def __init__(self, delta, exclusions=None):
+    def __init__(self, delta, exclusions=None, rescale=False):
         self.delta = delta
         self.exclusions = exclusions
+        self.rescale = rescale
 
     def __call__(self, shower, energy, rev=False):
         if rev:
-            transformed = torch.special.expit(shower)
-            #transformed = logit_trafo(shower, alpha=self.delta, inv=True)
+            if self.rescale:
+                transformed = logit(shower, alpha=self.delta, inv=True)
+            else:
+                transformed = torch.special.expit(shower)
         else:
-            transformed = torch.special.logit(shower, eps=self.delta)
-            #transformed = logit_trafo(shower, alpha=self.delta, inv=False)
+            if self.rescale:
+                transformed = logit(shower, alpha=self.delta)
+            else:
+                transformed = torch.logit(shower, eps=self.delta)
+
         if self.exclusions is not None:
             transformed[..., self.exclusions] = shower[..., self.exclusions] 
         return transformed, energy
@@ -328,10 +349,10 @@ class SetToVal(object):
                 transformed[mask] = self.val
         return transformed, energy        
 
-class ZeroMask2(object):
+class CutValues(object):
     """
-    Masks voxels to zero in the reverse transformation
-        cut: threshold value for the mask
+    Cut in Normalized space
+        cut: threshold value for the cut
     """
     def __init__(self, cut=0.):
         self.cut = cut
@@ -343,10 +364,7 @@ class ZeroMask2(object):
             if self.cut:
                 transformed[mask] = 0.0 
         else:
-            mask = (shower <= self.cut)
             transformed = shower
-            if self.cut:
-                transformed[mask] = 0.0 
         return transformed, energy        
 
 class ZeroMask(object):

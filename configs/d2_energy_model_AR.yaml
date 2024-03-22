@@ -1,28 +1,27 @@
-run_name: d2_energy_model_ARtransformer_LTF
+run_name: d2_energy_model_AR
 dtype: float32
 
 # Data
-hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
-eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
-xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
+eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
+xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
-eval_dataset: '2'
+eval_dataset: "2"
 
 # Preprocessing
 transforms:
     ScaleVoxels:
-        factor: 0.5
+        factor: 0.35
     NormalizeByElayer:
-        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
         xml_file: electron
     SelectDims:
         start: -45
         end: 0
     ExclusiveLogitTransform:
         delta: 1.0e-6
-        exclusions: [-45]
     StandardizeFromFile: {}
     LogEnergy: {}
     ScaleEnergy:
