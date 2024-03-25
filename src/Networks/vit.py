@@ -33,6 +33,7 @@ class ViT(nn.Module):
             'pos_embedding_coords': 'cartesian',
             'learn_pos_embed': False,
             'causal_attn': False,
+            'cos_attn': False
         }
 
         for k, p in defaults.items():
@@ -95,7 +96,7 @@ class ViT(nn.Module):
         self.blocks = nn.ModuleList([
             DiTBlock(
                 self.hidden_dim, self.num_heads, mlp_ratio=self.mlp_ratio,
-                attn_drop=self.attn_drop, proj_drop=self.proj_drop,
+                attn_drop=self.attn_drop, proj_drop=self.proj_drop, cos_attn=self.cos_attn,
                 attn_mask=self.attn_mask if self.causal_attn else None
             ) for _ in range(self.depth)
         ])
@@ -294,6 +295,7 @@ class Attention(nn.Module):
             proj_drop: float = 0.,
             attn_mask: torch.Tensor = None,
             norm_layer: nn.Module = nn.LayerNorm,
+            cos_attn: bool = False,
     ) -> None:
         super().__init__()
         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
@@ -308,21 +310,32 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
         self.attn_mask = attn_mask
+        self.cos_attn = cos_attn
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, N, C = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
         q, k = self.q_norm(q), self.k_norm(k)
-        x = nn.functional.scaled_dot_product_attention(
-            q, k, v, attn_mask=self.attn_mask,
-            dropout_p=self.attn_drop.p if self.training else 0.,
-        )
+        if self.cos_attn:
+            x = cosine_distance(q, k, v)
+        else:
+            x = nn.functional.scaled_dot_product_attention(
+                q, k, v, attn_mask=self.attn_mask,
+                dropout_p=self.attn_drop.p if self.training else 0.,
+            )
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-    
+
+def cosine_distance(q, k ,v):
+    k = k.transpose(-2, -1)
+    dots = q @ k
+    scale = torch.einsum('bhi, bhj -> bhij',
+            (torch.norm(q, 2, dim = -1), torch.norm(k, 2, dim = -2)))
+    out = torch.matmul(dots/scale, v)
+    return out
 
 def get_2d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
     """
