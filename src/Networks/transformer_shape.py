@@ -111,7 +111,7 @@ class ARtransformer_shape(nn.Module):
         subnet_config = self.params.get('subnet', 'UNet') 
         subnet_class = subnet_config['class']
         subnet_params = subnet_config['params']
-        condition_dim = self.dim_embedding + int(self.layer_cond)*self.dims_c
+        condition_dim = self.dim_embedding + int(self.layer_cond)*self.n_energy_layers
         if subnet_class == 'UNet':
             subnet_params['condition_dim'] = condition_dim
             return UNet(subnet_params)
