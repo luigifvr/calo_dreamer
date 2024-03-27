@@ -30,8 +30,8 @@ class ViT(nn.Module):
             'mlp_ratio': 4.0,
             'attn_drop': 0.,
             'proj_drop': 0.,
-            'pos_embedding_coords': 'cartesian',
-            'learn_pos_embed': False,
+            'cartesian_pos_encoding': False,
+            'learn_pos_encoding': False,
             'causal_attn': False,
         }
 
@@ -39,9 +39,6 @@ class ViT(nn.Module):
             setattr(self, k, param[k] if k in param else p)
 
         in_channels, *axis_sizes = self.shape
-
-        print(f'{in_channels=}')
-        print(f'{axis_sizes=}')
 
         # check shapes
         for i, (s, p) in enumerate(zip(axis_sizes, self.patch_shape)):
@@ -61,30 +58,25 @@ class ViT(nn.Module):
         )
         
         self.num_patches = [s // p for s, p in zip(axis_sizes, self.patch_shape)]
-        l, a, r = self.num_patches
         
-        # initialize position embeddings
-        if self.learn_pos_embed:
-            self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim//2))
-            self.register_buffer('lgrid', torch.arange(l)/l)
-            self.register_buffer('agrid', torch.arange(a)/a)
-            self.register_buffer('rgrid', torch.arange(r)/r)
-        else:
-            self.register_buffer(
-                'pos_embed',
-                get_2d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
-                if self.pos_embedding_coords == 'cylindrical' and self.dim == 2 else
-                get_2d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-                if self.pos_embedding_coords == 'cartesian' and self.dim == 2 else            
-                get_3d_cylindrical_sincos_pos_embed(self.num_patches, self.hidden_dim)
-                if self.pos_embedding_coords == 'cylindrical' and self.dim == 3 else
-                get_3d_cartesian_sincos_pos_embed(self.num_patches, self.hidden_dim)
-                if self.pos_embedding_coords == 'cartesian' and self.dim == 3 else None
-            )
+        # initialize fourier frequencies for position embeddings
+        fourier_dim = self.hidden_dim // (2*self.dim)
+        w = torch.arange(fourier_dim) / (fourier_dim - 1)
+        w = 1. / (10_000 ** w)
+        w = w.repeat(self.dim)
+        self.pos_encoding_freqs = nn.Parameter(
+            w.log() if self.learn_pos_encoding else w,
+            requires_grad=self.learn_pos_encoding
+        )
+
+        # initialize coordinate grids for position embeddings
+        for i, n in enumerate(self.num_patches):
+            self.register_buffer(f'grid_{i}', torch.arange(n)*(2*math.pi/n))
 
         # compute layer-causal attention mask
         if self.causal_attn:
             assert self.dim == 3, "A layer-causal attention mask should only be used in 3d"
+            l, a, r = self.num_patches
             patch_idcs = torch.arange(l*a*r)
             self.attn_mask = nn.Parameter(
                 patch_idcs[:,None]//(a*r) >= patch_idcs[None,:]//(a*r), # tril (causal)
@@ -106,14 +98,24 @@ class ViT(nn.Module):
         # custom weight initialization
         self.initialize_weights()
 
-    def learnable_pos_embedding(self):
-        wz, wy, wx = (self.pos_embed_freqs * 2 * math.pi).chunk(3)
-        z, y, x = torch.meshgrid(self.lgrid, self.agrid, self.rgrid, indexing='ij')
-        z = z.flatten()[:, None] * wz[None, :]
-        y = y.flatten()[:, None] * wy[None, :]
-        x = x.flatten()[:, None] * wx[None, :]
-        pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
-        return pe
+    def pos_encoding(self):
+        grids = [getattr(self, f'grid_{i}') for i in range(self.dim)]
+        coords = torch.meshgrid(*grids, indexing='ij')
+        if self.cartesian_pos_encoding:
+            # convert from polar to cartesian 
+            # radius=grids[-1], angle=grids[-2]
+            coords[-2], coords[-1] = coords[-1]*coords[-2].cos(), coords[-1]*coords[-2].sin()
+
+        if self.learn_pos_encoding:
+            freqs = self.pos_encoding_freqs.exp().chunk(self.dim)
+        else:
+            freqs = self.pos_encoding_freqs.chunk(self.dim)
+
+        features = [
+            trig_fn(x.flatten()[:,None] * w[None, :])
+            for (x, w) in zip(coords, freqs) for trig_fn in (torch.sin, torch.cos)
+        ]
+        return torch.cat(features, dim = 1)
 
     def initialize_weights(self):
         # Initialize transformer layers:
@@ -146,12 +148,9 @@ class ViT(nn.Module):
         t: (B,) tensor of diffusion timesteps
         c: (B, K) tensor of conditions
         """
-        x = self.to_patches(x)
-        if self.learn_pos_embed:
-            x = self.x_embedder(x) + self.learnable_pos_embedding()
-        else:
-            x = self.x_embedder(x) + self.pos_embed # (B, T, D), where T = (L*A*R)/prod(patch_size)
-
+        
+        x = self.to_patches(x)                   # (B, T, D), where T = prod(num_patches)
+        x = self.x_embedder(x) + self.pos_encoding()
         t = self.t_embedder(t)                   # (B, D)
         c = self.c_embedder(c)                   # (B, D)
         c = t + c                                # (B, D)
@@ -194,7 +193,6 @@ class ViT(nn.Module):
         return x       
 
                       
-
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
 
@@ -322,99 +320,3 @@ class Attention(nn.Module):
         x = self.proj(x)
         x = self.proj_drop(x)
         return x
-    
-
-def get_2d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):
-    """
-    Embeds patch positions based directly on input indices, which are assumed
-    to be depth, angle, radius.
-    """
-    A, R = num_patches
-    y, x = torch.meshgrid(
-        torch.arange(A) / A, torch.arange(R) / R, indexing='ij'
-    )
-
-    fourier_dim = dim // 4
-    omega = torch.arange(fourier_dim) / (fourier_dim - 1)
-    omega = 1. / (temperature ** omega)
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
-    # padding can be implemented here
-
-    return pe
-
-
-def get_2d_cartesian_sincos_pos_embed(num_patches, dim, temperature=10000):
-    """
-    Embeds patch positions after converting input indices from polar to cartesian
-    coordinates. i.e. depth, angle, radius -> depth, height, width
-    """
-    A, R = num_patches
-    alpha, r = torch.meshgrid(
-        torch.arange(A) * (2 * math.pi / A), torch.arange(R) / R,
-        indexing='ij'
-    )
-    x = r * alpha.cos()
-    y = r * alpha.sin()
-
-    fourier_dim = dim // 4
-    omega = torch.arange(fourier_dim) / (fourier_dim - 1)
-    omega = 1. / (temperature ** omega)
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos()), dim=1)
-    # padding can be implemented here
-
-    return pe
-
-
-def get_3d_cylindrical_sincos_pos_embed(num_patches, dim, temperature=10000):    
-    """
-    Embeds patch positions based directly on input indices, which are assumed
-    to be depth, angle, radius.
-    """
-    L, A, R = num_patches
-    z, y, x = torch.meshgrid(
-        torch.arange(L)/L, torch.arange(A)/A,torch.arange(R)/R, indexing='ij'
-    )
-
-    fourier_dim = dim // 6
-    omega = torch.arange(fourier_dim) / (fourier_dim - 1)
-    omega = 1. / (temperature ** omega)    
-    z = z.flatten()[:, None] * omega[None, :]
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-    
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
-    # padding can be implemented here
-
-    return pe
-
-
-def get_3d_cartesian_sincos_pos_embed(num_patches, dim, temperature=10000):    
-    """
-    Embeds patch positions after converting input indices from polar to cartesian
-    coordinates. i.e. depth, angle, radius -> depth, height, width
-    """
-    L, A, R = num_patches
-    z, alpha, r = torch.meshgrid(
-        torch.arange(L)/L, torch.arange(A)*(2*math.pi/A), torch.arange(R)/R,
-        indexing='ij'
-    )
-    x = r*alpha.cos()
-    y = r*alpha.sin()
-
-    fourier_dim = dim // 6
-    omega = torch.arange(fourier_dim) / (fourier_dim - 1)
-    omega = 1. / (temperature ** omega)    
-    z = z.flatten()[:, None] * omega[None, :]
-    y = y.flatten()[:, None] * omega[None, :]
-    x = x.flatten()[:, None] * omega[None, :]
-    
-    pe = torch.cat((x.sin(), x.cos(), y.sin(), y.cos(), z.sin(), z.cos()), dim = 1)
-    # padding can be implemented here
-
-    return pe  
