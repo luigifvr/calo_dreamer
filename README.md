@@ -29,4 +29,4 @@ Run the dataset 3 model on cpu for specific sample and batch sizes
 python3 sample.py models/d3 --sample_size 10000 --batch_size 100 --use_cpu
 ```
 ## Outputs
-After runnning `sample.py`, a `HDF5` dataset will be created in the model directory, with keys `showers` and `energies`.
+After runnning `sample.py`, a `HDF5` dataset will be created in the model directory, with keys `showers` and `incident_energies`.
