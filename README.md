@@ -16,11 +16,11 @@ Options:
 The following arguments can optionally be specified
 Flag		| Usage
 ------------------------| ----------------------------------------
-`energy_model`  | Directory containing config and checkpoint for the energy model. `models/energy` is used by default.
-`sample_size`   | The number of samples to generate \[default 100,000\]
-`batch_size`    | The batch size used for sampling \[default 5,000\]
-`use_cpu` (flag)| Whether to run on cpu
-`which_cuda`    | Index of the cuda device to use \[default 0\]
+`energy_model`  | Directory containing config and checkpoint for the energy model \[default: `models/energy`\].
+`sample_size`   | The number of samples to generate \[default: `100_000`\]
+`batch_size`    | The batch size used for sampling \[default `5_000`\]
+`use_cpu`       | A flag indicating that the cpu should be used
+`which_cuda`    | Index of the cuda device to use \[default `0`\]
 
 Example 2:
 
