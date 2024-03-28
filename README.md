@@ -5,61 +5,26 @@ on the CaloChallenge datasets
 
 ## Usage
 
-Run with default settings
+Example 1 (minimal):
+
+Run the dataset 2 model with default settings
 ```
-python3 sample.py path/to/model/dir
+python3 sample.py models/d2
 ```
 
-The following flags can optionally be set:
-
-## TODO ##
-
-### Parameters
-
-Parameter		| Usage
+Options:
+The following arguments can optionally be specified
+Flag		| Usage
 ------------------------| ----------------------------------------
-run\_name		| Name of the output folder
-hdf5\_file		| Path to the .hdf5 file used for training
-xml\_filename		| Path to the .xml file used to extract the binning information
-p\_type 		| "photon", "pion", or "electron"
-dtype			| specify default dtype
-eval\_dataset		| "1-photons", "1-pions", "2", or "3" used in the CaloChallenge evaluation
+energy_model  | Directory containing config and checkpoint for the energy model. `models/energy` is used by default.
+sample_size   | The number of samples to generate \[default 100,000\]
+batch_size    | The batch size used for sampling \[default 5,000\]
+use_cpu (flag)| Whether to run on cpu
+which_cuda    | Index of the cuda device to use \[default 0\]
 
-### Training parameters
+Example 2:
 
-Parameter 		| Usage
-------------------------| ----------------------------------------
-dim			| Dimensionality of the input
-n\_con			| Number of conditions
-width\_noise		| Noise width used for the noise injection
-val\_frac		| Fraction of events used for validation
-transforms		| Pre-processing steps defined as an ordered dictionary
-lr			| learning rate
-max\_lr			| Maximum learning rate for OneCycleLR scheduling
-batch\_size		| batch size
-validate\_every		| Interval between validations in epochs
-use\_scheduler 		| True or False
-lr\_scheduler		| string that defines the learning rate scheduler
-cycle\_epochs		| defines the length of the cycle for the OneCycleLR, default to # of epochs
-save\_interval		| Interval between each model saving in epochs
-n\_epochs		| Number of epochs
-alpha			| Regularizer for the log transformation
-
-### ResNet parameters
-
-Parameter		| Usage
-------------------------|----------------------------------------
-intermediate\_dim	| Dimension of the intermediate layer
-layers\_per\_block	| Number of layers per block
-n\_blocks		| Number of blocks
-conditional		| True/False, it should be always True
-
-An example yaml file is provided in `./configs/cfm_base.yaml`.
-
-Plotting:
-
-To run the sampling and the evaluation of a trained model.
+Run the dataset 3 model on cpu for specific sample and batch sizes
 ```
-python3 src/main.py --use_cuda --plot --model_dir path/to/model --epoch model_name
+python3 sample.py models/d3 --sample_size 10000 --batch_size 100 --use_cpu
 ```
-
