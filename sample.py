@@ -82,6 +82,9 @@ def sample(args):
     t_1 = time.time()
     print(f"[sample.py]: Finished generating {len(showers)} samples in {t_1 - t_0:.2f} s.")
 
+    # implement voxel energy cutoff
+    showers *= showers >= config['eval_cut']
+
     # save samples
     savepath = os.path.join(args.model, 'samples.hdf5')
     with h5py.File(savepath, 'w') as f:

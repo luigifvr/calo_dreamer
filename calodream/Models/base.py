@@ -23,7 +23,7 @@ class GenerativeModel(nn.Module):
         self.transforms = get_transformations(params.get('transforms', None), model_dir)
         
         param_count = sum(p.numel() for p in self.net.parameters() if p.requires_grad)
-        print(f'[CaloDREAM]: {self.__class__.__name__} has {param_count} parameters')
+        print(f'[CaloDREAM] {self.__class__.__name__} has {param_count} parameters')
         self.params['parameter_count'] = param_count
 
     def build_net(self):
