@@ -1,25 +1,18 @@
-# CaloDream
+# CaloDREAM
 
-A repository for fast detector simulation using Stable Diffusion
-on the CaloChallenge datasets.
-
-Two recent papers using diffusion models:
-
-**CaloScore** (Ben Nachman, Vinicius Mikuni)
-[https://arxiv.org/abs/2206.11898](https://arxiv.org/abs/2206.11898)
-
-**CaloDiffusion** (Oz Amram, Kevin Pedro)
-[https://arxiv.org/abs/2308.03876](https://arxiv.org/abs/2308.03876)
+A repository for fast detector simulation using Conditional Flow Matching
+on the CaloChallenge datasets
 
 ## Usage
 
-Training:
+Run with default settings
 ```
-python3 src/main.py --use_cuda path/to/yaml
+python3 sample.py path/to/model/dir
 ```
 
-The documenter will create a folder in `results` with the date as
-prefix and the specified `run_name`.
+The following flags can optionally be set:
+
+## TODO ##
 
 ### Parameters
 
