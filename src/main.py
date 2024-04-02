@@ -25,7 +25,7 @@ def main():
     device = f'cuda:{args.which_cuda}' if use_cuda else 'cpu'
     print('device: ', device)
 
-    if args.plot:
+    if args.model_dir:
         doc = Documenter(params['run_name'], existing_run=args.model_dir)
     else:
         doc = Documenter(params['run_name'])
