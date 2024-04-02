@@ -17,7 +17,7 @@ Options:
 The following arguments can optionally be specified
 Flag		| Usage
 ------------------------| ----------------------------------------
-`energy_model`  | Directory containing config and checkpoint for the energy model \[default: `models/energy`\].
+`energy_model`  | Directory containing config and checkpoint for the energy model \[default: `models/energy`\]
 `sample_size`   | The number of samples to generate \[default: `100_000`\]
 `batch_size`    | The batch size used for sampling \[default `5_000`\]
 `use_cpu`       | A flag indicating that the cpu should be used
