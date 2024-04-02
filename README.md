@@ -13,6 +13,7 @@ python3 sample.py models/d2
 ```
 
 Options:
+
 The following arguments can optionally be specified
 Flag		| Usage
 ------------------------| ----------------------------------------
