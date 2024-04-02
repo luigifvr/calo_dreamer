@@ -1,10 +1,10 @@
-run_name: d2_energy_model_AR
+run_name: d2_AR_energy_layercond
 dtype: float32
 
 # Data
-hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_1.hdf5
-eval_hdf5_file: /remote/gpu05/palacios/calo_dreamer/datasets/calo_challenge/dataset_2_2.hdf5
-xml_filename: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_1.hdf5
+eval_hdf5_file: /data/projects/punim0011/aore/CaloChallenge/2/dataset_2_2.hdf5
+xml_filename: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
 val_frac: 0.2
 eps: 1.0e-10
 particle_type: electron
@@ -12,16 +12,18 @@ eval_dataset: "2"
 
 # Preprocessing
 transforms:
-    ScaleVoxels:
-        factor: 0.35
+    # ScaleVoxels:
+    #     factor: 0.35
     NormalizeByElayer:
-        ptype: /remote/gpu02/ore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
+        ptype: /home/aore/calo_dreamer/src/challenge_files/binning_dataset_2.xml
         xml_file: electron
     SelectDims:
         start: -45
         end: 0
     ExclusiveLogitTransform:
         delta: 1.0e-6
+        exclusions: [-45]
+        rescale: False
     StandardizeFromFile: {}
     LogEnergy: {}
     ScaleEnergy:
@@ -40,9 +42,12 @@ n_head: 4
 n_encoder_layers: 4
 n_decoder_layers: 4
 dim_feedforward: 512
+#dropout_transformer: 0.0
+dropout: 0.5
 #encode_c_dim: 64
 n_con: 1
 conditional: True
+layer_cond: False
 #c_embed: True
 #x_embed: True
 #conditional: True
@@ -60,8 +65,8 @@ use_scheduler: True
 lr_scheduler: one_cycle_lr
 # weight_decay: 0.001
 betas: [0.9, 0.999]
-n_epochs: 500
-cycle_epochs: 500
+n_epochs: 800
+cycle_epochs: 800
 save_interval: 100_001
 sample_periodically: False
 sample_every: 10
@@ -79,4 +84,3 @@ solver_kwargs:
     method: rk4
     options:
         step_size: 0.02
-

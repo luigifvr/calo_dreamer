@@ -1,4 +1,4 @@
-run_name: d2_vit_341patch_grid_causal_1000e
+run_name: d2_vit_newlearnpos_fixed+linear
 dtype: float32
 
 # Model
@@ -23,7 +23,7 @@ transforms: {
         xml_file: electron
     },
     SelectiveUniformNoise: {
-        noise_width: 5.0e-6,
+        noise_width: 5.0e-7,
         cut: True,
         exclusions: [-45, -44, -43, -42, -41, -40, -39, -38, -37,
                      -36, -35, -34, -33, -32, -31, -30, -29, -28,
@@ -44,16 +44,17 @@ lr: 1.e-3
 # max_lr: 2.e-3
 batch_size: 250
 validate_every: 5
-use_scheduler: True
-lr_scheduler: CosineAnnealing
+# use_scheduler: True
+# lr_scheduler: CosineAnnealing
 # weight_decay: 1.e-3
 betas: [0.9, 0.999]
-n_epochs: 1000
-cycle_epochs: 1000
+n_epochs: 100
+cycle_epochs: 100
 cycle_pct_start: 0.1
 save_interval: 100_001
 
 # Sampling
+n_samples: 10000
 sample_periodically: False
 sample_every: 10
 sample_every_n_samples: 1001
@@ -62,12 +63,13 @@ solver_kwargs: {method: rk4, options: {step_size: 0.02}}
 # Network
 network: ViT
 condition_dim: 46
-patch_shape: [3, 4, 1]
+patch_shape: [3, 4, 3]
 hidden_dim: 96
-depth: 6
-num_heads: 6
+depth: 2
+num_heads: 2
 mlp_ratio: 4.0
-pos_embedding_coords: cylindrical
-causal_attn: True
-attn_drop: 0.05
-proj_drop: 0.05
+cartesian_pos_encoding: False
+learn_pos_encoding: False
+causal_attn: False
+# attn_drop: 0.05
+# proj_drop: 0.05

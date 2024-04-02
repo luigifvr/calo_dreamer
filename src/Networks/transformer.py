@@ -1,10 +1,13 @@
 import math
-from typing import Type, Callable, Union, Optional
+import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from einops import repeat
 from torchdiffeq import odeint
+from typing import Type, Callable, Union, Optional
 from .vblinear import VBLinear
-import numpy as np
 
 
 class ARtransformer(nn.Module):
@@ -13,11 +16,11 @@ class ARtransformer(nn.Module):
         super().__init__()
         # Read in the network specifications from the params
         self.params = params
-
         self.dim_embedding = self.params["dim_embedding"]
         self.dims_in = self.params["shape"][0]
         self.dims_c = self.params["n_con"]
         self.bayesian = False
+        self.layer_cond = self.params.get("layer_cond", False)
 
         self.c_embed = self.params.get("c_embed", None)
         self.x_embed = self.params.get("x_embed", None)
@@ -36,24 +39,27 @@ class ARtransformer(nn.Module):
             batch_first=True,
         )
         if self.x_embed:
-            self.x_embed = nn.Sequential(nn.Linear(1, self.dim_embedding),
-                                     nn.Linear(self.dim_embedding, self.dim_embedding))
+            self.x_embed = nn.Sequential(
+                nn.Linear(1, self.dim_embedding),
+                nn.Linear(self.dim_embedding, self.dim_embedding)
+            )
         if self.c_embed:
-            self.c_embed = nn.Sequential(nn.Linear(1, self.dim_embedding), nn.ReLU(),
-                                               nn.Linear(self.dim_embedding, self.dim_embedding))
-        self.t_embed = nn.Sequential(GaussianFourierProjection(embed_dim=self.encode_t_dim,
-                                                                     scale=self.encode_t_scale),
-                                           nn.Linear(self.encode_t_dim, self.encode_t_dim))
-
+            self.c_embed = nn.Sequential(
+                nn.Linear(1, self.dim_embedding),
+                nn.ReLU(),
+                nn.Linear(self.dim_embedding, self.dim_embedding)
+            )
+        self.t_embed = nn.Sequential(
+            GaussianFourierProjection(embed_dim=self.encode_t_dim, scale=self.encode_t_scale),
+            nn.Linear(self.encode_t_dim, self.encode_t_dim)
+        )
         self.subnet = self.build_subnet()
-        self.positional_encoding = PositionalEncoding(d_model=self.dim_embedding,
-                                                      max_len=max(self.dims_in, self.dims_c) + 1,
-                                                      dropout=0.0)
+        self.positional_encoding = PositionalEncoding(
+            d_model=self.dim_embedding, max_len=max(self.dims_in, self.dims_c) + 1, dropout=0.0
+        )
 
     def compute_embedding(
-        self, p: torch.Tensor,
-            dim: int,
-            embedding_net: Optional[nn.Module]
+        self, p: torch.Tensor, dim: int, embedding_net: Optional[nn.Module]
     ) -> torch.Tensor:
         """
         Appends the one-hot encoded position to the momenta p. Then this is either zero-padded
@@ -78,7 +84,10 @@ class ARtransformer(nn.Module):
         self.layers_per_block = self.params.get("layers_per_block", 8)
         self.normalization = self.params.get("normalization", None)
 
-        linear = nn.Linear(self.dim_embedding + self.encode_t_dim + 1, self.intermediate_dim)
+        cond_dim = self.encode_t_dim + self.dim_embedding
+        if self.layer_cond:
+            cond_dim += self.dims_in
+        linear = nn.Linear(1+cond_dim, self.intermediate_dim)
         layers = [linear, getattr(nn, self.activation)()]
 
         for _ in range(1, self.layers_per_block - 1):
@@ -115,9 +124,7 @@ class ARtransformer(nn.Module):
         # Solve ODE from t=1 to t=0
         with torch.inference_mode():
             x_t = odeint(
-                net_wrapper,
-                x_0,
-                torch.tensor([0, 1], dtype=dtype, device=device),
+                net_wrapper, x_0, torch.tensor([0, 1], dtype=dtype, device=device),
                 **self.params.get("solver_kwargs", {})
             )
         # Extract generated samples and mask out masses if not needed
@@ -129,43 +136,39 @@ class ARtransformer(nn.Module):
         if not rev:
             xp = nn.functional.pad(x[:, :-1], (0, 0, 1, 0))
             embedding = self.transformer(
-                src=self.compute_embedding(
-                    c,
-                    dim=self.dims_c,
-                    embedding_net=self.c_embed,
-                ),
-                tgt=self.compute_embedding(
-                    xp,
-                    dim=self.dims_in + 1,
-                    embedding_net=self.x_embed,
-                ),
+                src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
+                tgt=self.compute_embedding(xp, dim=self.dims_in + 1, embedding_net=self.x_embed),
                 tgt_mask=torch.ones(
                     (xp.shape[1], xp.shape[1]), device=x.device, dtype=torch.bool
                 ).triu(diagonal=1),
             )
 
+            if self.layer_cond:
+                layer_one_hot = repeat(
+                    torch.eye(self.dims_in, device=x.device), '... -> b ...', b=len(c)
+                )
+                embedding = torch.cat([embedding, layer_one_hot], dim=2)
+
             t = self.t_embed(t)
             pred = self.subnet(torch.cat([x_t, t, embedding], dim=-1))
         else:
             x = torch.zeros((c.shape[0], 1, 1), device=c.device, dtype=c.dtype)
-            c_embed = self.compute_embedding(
-            c, dim=self.dims_c, embedding_net=self.c_embed)
+            c_embed = self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.dims_in):
                 embedding = self.transformer(
                     src=c_embed,
-                    tgt=self.compute_embedding(
-                        x,
-                        dim=self.dims_in + 1,
-                        embedding_net=self.x_embed,
-                    ),
+                    tgt=self.compute_embedding(x, dim=self.dims_in + 1, embedding_net=self.x_embed),
                     tgt_mask=torch.ones(
                         (x.shape[1], x.shape[1]), device=x.device, dtype=torch.bool
                     ).triu(diagonal=1),
                 )
-                x_new = self.sample_dimension(
-                    embedding[:, -1:, :]
-                )
-
+                if self.layer_cond:
+                    layer_one_hot = repeat(
+                        F.one_hot(torch.tensor(i, device=x.device), self.dims_in),
+                        'd -> b 1 d', b=len(c)
+                    )
+                    embedding = torch.cat([embedding[:, -1:,:], layer_one_hot], dim=2)
+                x_new = self.sample_dimension(embedding[:, -1:, :])
                 x = torch.cat((x, x_new), dim=1)
 
             pred = x[:, 1:]

@@ -30,7 +30,6 @@ class ARtransformer_shape(nn.Module):
 
         self.encode_t_dim = self.params.get("encode_t_dim", 64)
         self.encode_t_scale = self.params.get("encode_t_scale", 30)
-        self.layer_cond = self.params.get("layer_cond", False)
 
         self.transformer = nn.Transformer(
             d_model=self.dim_embedding,
@@ -56,14 +55,7 @@ class ARtransformer_shape(nn.Module):
                 nn.Flatten(1), # (b l) c x y -> (b l) (c x y)
                 nn.SiLU(),
                 nn.Linear(intermediate_dim, self.dim_embedding),
-            )
-            # self.x_embed = nn.Sequential(
-            #     nn.Flatten(0, 1), # b l c x y -> (b l) c x y
-            #     nn.MaxPool2d(kernel, stride),
-            #     nn.Flatten(1), # (b l) c x y -> (b l) (c x y)
-            #     # nn.SiLU(),
-            #     nn.Linear(intermediate_dim//ouch, self.dim_embedding),
-            # )                   
+            )                  
         elif self.x_embed == 'linear':
             self.x_embed_net = nn.Linear(self.dims_in, self.dim_embedding)
         else:
@@ -111,7 +103,7 @@ class ARtransformer_shape(nn.Module):
         subnet_config = self.params.get('subnet', 'UNet') 
         subnet_class = subnet_config['class']
         subnet_params = subnet_config['params']
-        condition_dim = self.dim_embedding + int(self.layer_cond)*self.dims_c
+        condition_dim = self.dim_embedding + int(self.layer_cond)*self.n_energy_layers
         if subnet_class == 'UNet':
             subnet_params['condition_dim'] = condition_dim
             return UNet(subnet_params)
@@ -175,10 +167,12 @@ class ARtransformer_shape(nn.Module):
             
         else:
             x = torch.zeros((len(c), 1, *self.shape[1:]), device=c.device, dtype=c.dtype)
+            c_embed = self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed)
             for i in range(self.n_energy_layers):
+                
                 if self.x_embed != 'conv': x = x.flatten(2) # b l c x y -> b l (c x y)
                 embedding = self.transformer(
-                    src=self.compute_embedding(c, dim=self.dims_c, embedding_net=self.c_embed),
+                    src=c_embed,
                     tgt=self.compute_embedding(
                         x, dim=self.n_energy_layers+1, embedding_net=self.x_embed_net,
                     ),
