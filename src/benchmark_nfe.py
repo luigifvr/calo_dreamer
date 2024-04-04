@@ -55,9 +55,9 @@ def benchmark(args, doc, device):
     for model_type in 'energy', 'shape':
         model_dir = getattr(args, model_type+'_model')
         params = load_params(os.path.join(model_dir, 'params.yaml'))
-        params['eval_mode'] = args.eval_mode
-        model = Models.TBD(params, device=device,
-            doc=Documenter(None, existing_run=model_dir, read_only=True)
+        params['eval_mode'] = args.eval_mode 
+        model = getattr(Models, params.get('model', 'TBD'))(
+            params, device=device, doc=Documenter(None, existing_run=model_dir, read_only=True)
         )
         model.load()
         # set to eval mode
@@ -84,17 +84,16 @@ def benchmark(args, doc, device):
     
     for _ in range(args.n_runs):
         
-        # initialize condition loader
-        Eincs = DataLoader(
-            dataset=torch.rand([args.n_samples, 1], device=device),
-            batch_size=args.batch_size, shuffle=False
-        )
+        with torch.inference_mode():
+            # initialize condition loader
+            Eincs = DataLoader(
+                dataset=torch.rand([args.n_samples, 1], device=device), batch_size=args.batch_size,
+                shuffle=False
+            )
 
-        # loop over batches and generate sample
-        samples, conds, nfes = [], [], []
-        for Einc in Eincs:
-
-            with torch.inference_mode():
+            # loop over batches and generate sample
+            samples, conds, nfes = [], [], []
+            for Einc in Eincs:
 
                 # first sample layer energies
                 u_sample = models['energy'].sample_batch(Einc)
@@ -106,33 +105,27 @@ def benchmark(args, doc, device):
                     sample = solver.solve(cond)
                 else:
                     solve_fn = SolveFunc(models['shape'].net, cond, device)
-                    y0 = torch.randn(
-                        (args.batch_size, *models['shape'].shape),
-                        device=device
-                    )
+                    y0 = torch.randn((args.batch_size, *models['shape'].shape), device=device)
                     sample = odeint(
-                        solve_fn, y0, solve_times, method=args.solver,
-                        **solver_kwargs
+                        solve_fn, y0, solve_times, method=args.solver, **solver_kwargs
                     )[-1]
-            
-            # optionally keep track of nfe
-            if args.solver in ADAPTIVE_SOLVERS:
-                nfes.append(solve_fn.nfe)
-            
-            # collect samples on cpu
-            samples.append(sample.cpu())
-            conds.append(cond.cpu())
                 
-        # post-process
-        sample = torch.vstack(samples)
-        cond = torch.vstack(conds)
-        for fn in models['shape'].transforms[::-1]:
-            sample, cond = fn(sample, cond, rev=True)
+                # optionally keep track of nfe
+                if args.solver in ADAPTIVE_SOLVERS:
+                    nfes.append(solve_fn.nfe)
+                
+                # collect samples on cpu
+                samples.append(sample.cpu())
+                conds.append(cond.cpu())
+                    
+            # post-process
+            sample = torch.vstack(samples)
+            cond = torch.vstack(conds)
+            for fn in models['shape'].transforms[::-1]:
+                sample, cond = fn(sample, cond, rev=True)
 
         # classify
-        evaluate.run_from_py(
-            sample.numpy(), cond.numpy(), doc, models['shape'].params
-        )
+        evaluate.run_from_py(sample.numpy(), cond.numpy(), doc, models['shape'].params)
 
         # append mean NFE to the log
         if args.solver in ADAPTIVE_SOLVERS:
@@ -141,7 +134,7 @@ def benchmark(args, doc, device):
         
 if __name__ == '__main__':
 
-    device = 'cuda' if torch.cuda.is_available() and ~args.no_cuda else 'cpu'
+    device = 'cuda' if torch.cuda.is_available() and  not args.no_cuda else 'cpu'
     precision = args.tols if args.solver in ADAPTIVE_SOLVERS else args.steps
     doc = Documenter(f'benchmark_{args.solver}_{precision}')
     torch.set_default_dtype(torch.float32) # was a PAIN to realise this is needed
