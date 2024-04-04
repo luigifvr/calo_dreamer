@@ -134,7 +134,25 @@ class ScaleVoxels(object):
         else:
             transformed = shower*self.factor
         return transformed, energy
-    
+
+class ScaleTotalEnergy(object):
+    """
+    Scale only E_tot/E_inc by a factor f.
+    The effect is the same of ScaleVoxels but
+    it is applied in a different position in the
+    preprocessing chain.
+    """
+    def __init__(self, factor, n_layers=45):
+        self.factor = factor
+        self.n_layers = n_layers
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            shower[..., -self.n_layers] /= self.factor
+        else:
+            shower[..., -self.n_layers] *= self.factor
+        return shower, energy
+
 class ScaleEnergy(object):
     """
     Scale incident energies to lie in the range [0, 1]
@@ -517,6 +535,7 @@ class NormalizeByElayer(object):
             transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
+
 class AddCoordChannels(object):
     """
     Add channel to image containing the coordinate value along particular

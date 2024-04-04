@@ -505,10 +505,10 @@ class GenerativeModel(nn.Module):
             self.train_losses_epoch = state_dicts.get("losses", {})
         if "epoch" in state_dicts:
             self.epoch = state_dicts.get("epoch", 0)
-        if "opt" in state_dicts:
-            self.optimizer.load_state_dict(state_dicts["opt"])
-        if "scheduler" in state_dicts:
-            self.scheduler.load_state_dict(state_dicts["scheduler"])
+        #if "opt" in state_dicts:
+        #    self.optimizer.load_state_dict(state_dicts["opt"])
+        #if "scheduler" in state_dicts:
+        #    self.scheduler.load_state_dict(state_dicts["scheduler"])
         self.net.to(self.device)
 
     def load_other(self, model_dir):
