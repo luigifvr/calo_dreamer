@@ -158,7 +158,7 @@ class GenerativeModel(nn.Module):
                 eps = params.get("eps", 1e-6),
                 weight_decay = params.get("weight_decay", 0.)
                 )
-        self.scheduler = set_scheduler(self.optimizer, params, steps_per_epoch)
+        self.scheduler = set_scheduler(self.optimizer, params, steps_per_epoch, last_epoch=-1)
 
     def run_training(self):
 
@@ -166,6 +166,9 @@ class GenerativeModel(nn.Module):
         samples = []
         n_epochs = get(self.params, "n_epochs", 100)
         past_epochs = get(self.params, "total_epochs", 0)
+        if past_epochs != 0:
+            self.load(epoch=past_epochs)
+            self.scheduler = set_scheduler(self.optimizer, self.params, self.n_trainbatches, last_epoch=self.params.get("total_epochs", -1)*self.n_trainbatches)
         print(f"train_model: Model has been trained for {past_epochs} epochs before.")
         print(f"train_model: Beginning training. n_epochs set to {n_epochs}")
         t_0 = time.time()
@@ -485,11 +488,11 @@ class GenerativeModel(nn.Module):
  
     def save(self, epoch=""):
         """ Save the model, and more if needed"""
-        torch.save({#"opt": self.optim.state_dict(),
+        torch.save({"opt": self.optimizer.state_dict(),
                     "net": self.net.state_dict(),
-                    #"losses": self.losses_test,
-                    #"learning_rates": self.learning_rates,
-                    }#"epoch": self.epoch}
+                    "losses": self.train_losses_epoch,
+                    "epoch": self.epoch,
+                    "scheduler": self.scheduler.state_dict()}
                     , self.doc.get_file(f"model{epoch}.pt"))
 
     def load(self, epoch=""):
@@ -497,11 +500,15 @@ class GenerativeModel(nn.Module):
         name = self.doc.get_file(f"model{epoch}.pt")
         state_dicts = torch.load(name, map_location=self.device)
         self.net.load_state_dict(state_dicts["net"])
-
-        #self.losses_test = state_dicts.get("losses", {})
-        #self.learning_rates = state_dicts.get("learning_rates", [])
-        #self.epoch = state_dicts.get("epoch", 0)
-        #self.optim.load_state_dict(state_dicts["opt"])
+        
+        if "losses" in state_dicts:
+            self.train_losses_epoch = state_dicts.get("losses", {})
+        if "epoch" in state_dicts:
+            self.epoch = state_dicts.get("epoch", 0)
+        if "opt" in state_dicts:
+            self.optimizer.load_state_dict(state_dicts["opt"])
+        if "scheduler" in state_dicts:
+            self.scheduler.load_state_dict(state_dicts["scheduler"])
         self.net.to(self.device)
 
     def load_other(self, model_dir):
