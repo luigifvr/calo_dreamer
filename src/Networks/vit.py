@@ -62,10 +62,10 @@ class ViT(nn.Module):
         )
         
         self.num_patches = [s // p for s, p in zip(axis_sizes, self.patch_shape)]
-        l, a, r = self.num_patches
         
         # initialize position embeddings
         if self.learn_pos_embed:
+            l, a, r = self.num_patches
             self.pos_embed_freqs = nn.Parameter(torch.randn(self.hidden_dim//2))
             self.register_buffer('lgrid', torch.arange(l)/l)
             self.register_buffer('agrid', torch.arange(a)/a)
@@ -85,6 +85,7 @@ class ViT(nn.Module):
 
         # compute layer-causal attention mask
         if self.causal_attn:
+            l, a, r = self.num_patches
             assert self.dim == 3, "A layer-causal attention mask should only be used in 3d"
             patch_idcs = torch.arange(l*a*r)
             self.attn_mask = nn.Parameter(
