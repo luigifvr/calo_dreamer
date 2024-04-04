@@ -33,6 +33,8 @@ class ViT(nn.Module):
             'cartesian_pos_encoding': False,
             'learn_pos_encoding': False,
             'causal_attn': False,
+            'final_conv': False,
+            'final_conv_channels': None
         }
 
         for k, p in defaults.items():
@@ -93,8 +95,14 @@ class ViT(nn.Module):
         ])
 
         # initialize output layer
-        self.final_layer = FinalLayer(self.hidden_dim, self.patch_shape, in_channels)
-
+        if self.final_conv:
+            final_conv_channels = self.final_conv_channels or in_channels
+            self.final_layer = FinalLayer(self.hidden_dim, self.patch_shape, final_conv_channels)
+            conv_op = {2: nn.Conv2d, 3: nn.Conv3d}[self.dim]
+            self.conv_layer = conv_op(final_conv_channels, in_channels, kernel_size=3, padding=1)
+        else:
+            self.final_layer = FinalLayer(self.hidden_dim, self.patch_shape, in_channels)
+            
         # custom weight initialization
         self.initialize_weights()
 
@@ -154,11 +162,33 @@ class ViT(nn.Module):
         t = self.t_embedder(t)                   # (B, D)
         c = self.c_embedder(c)                   # (B, D)
         c = t + c                                # (B, D)
-        
+
+        # if self.long_skips:
+        #     N = (len(self.blocks)+1)//2 - 1 # length of the 'down' and 'up' paths
+        #     residuals = []
+
+        #     # down path
+        #     for block in self.blocks[:N]:
+        #         x = 
+        #         residuals
+        #     # bottleneck
+        #     for block in self.blocks[N:-N]:
+        #         x = block(x, c)
+
+        #     # up path
+        #     for block in self.blocks[-N:]:
+
+            # for block in self.blocks:
+            #     x = block(x, c)                      # (B, T, D)
+
+        # else:
+
         for block in self.blocks:
             x = block(x, c)                      # (B, T, D)
         x = self.final_layer(x, c)               # (B, T, prod(patch_shape) * out_channels)
-        x = self.from_patches(x)                 # (B, out_channels, *axis_sizes)            
+        x = self.from_patches(x)                 # (B, out_channels, *axis_sizes)
+        if self.final_conv:
+            x = self.conv_layer(x)
 
         return x
 
