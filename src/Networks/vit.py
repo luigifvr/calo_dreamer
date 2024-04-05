@@ -34,7 +34,8 @@ class ViT(nn.Module):
             'learn_pos_encoding': False,
             'causal_attn': False,
             'final_conv': False,
-            'final_conv_channels': None
+            'final_conv_channels': None,
+            'long_skips': False
         }
 
         for k, p in defaults.items():
@@ -157,38 +158,26 @@ class ViT(nn.Module):
         c: (B, K) tensor of conditions
         """
         
-        x = self.to_patches(x)                   # (B, T, D), where T = prod(num_patches)
-        x = self.x_embedder(x) + self.pos_encoding()
-        t = self.t_embedder(t)                   # (B, D)
-        c = self.c_embedder(c)                   # (B, D)
-        c = t + c                                # (B, D)
+        x = self.to_patches(x)                       # (B, T, D), where T = prod(num_patches)
+        x = self.x_embedder(x) + self.pos_encoding() # (B, T, D)
+        t = self.t_embedder(t)                       # (B, D)
+        c = self.c_embedder(c)                       # (B, D)
+        c = t + c                                    # (B, D)
 
-        # if self.long_skips:
-        #     N = (len(self.blocks)+1)//2 - 1 # length of the 'down' and 'up' paths
-        #     residuals = []
+        N = (len(self.blocks)+1)//2 - 1 # for long skips
+        residuals = []                  # for long skips
+        for i, block in enumerate(self.blocks):
+            x = block(x, c) # (B, T, D)
+            if self.long_skips:
+                if i < N:
+                    residuals.append(x)
+                elif i >= len(self.blocks)-N:
+                    x = x + residuals.pop()
 
-        #     # down path
-        #     for block in self.blocks[:N]:
-        #         x = 
-        #         residuals
-        #     # bottleneck
-        #     for block in self.blocks[N:-N]:
-        #         x = block(x, c)
-
-        #     # up path
-        #     for block in self.blocks[-N:]:
-
-            # for block in self.blocks:
-            #     x = block(x, c)                      # (B, T, D)
-
-        # else:
-
-        for block in self.blocks:
-            x = block(x, c)                      # (B, T, D)
-        x = self.final_layer(x, c)               # (B, T, prod(patch_shape) * out_channels)
-        x = self.from_patches(x)                 # (B, out_channels, *axis_sizes)
+        x = self.final_layer(x, c) # (B, T, prod(patch_shape) * out_channels)
+        x = self.from_patches(x)   # (B, out_channels, *axis_sizes)
         if self.final_conv:
-            x = self.conv_layer(x)
+            x = self.conv_layer(x) # (B, out_channels, *axis_sizes)
 
         return x
 
