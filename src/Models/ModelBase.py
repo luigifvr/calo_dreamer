@@ -472,7 +472,7 @@ class GenerativeModel(nn.Module):
         if doc is None: doc = self.doc
         mode = self.params.get('eval_mode', 'all')
         script_args = (
-            f"-i {doc.basedir}/samples{name}.hdf5 "
+            f"-i {doc.basedir}/ "
             f"-r {self.params['eval_hdf5_file']} -m {mode} --cut {self.params['eval_cut']} "
             f"-d {self.params['eval_dataset']} --output_dir {doc.basedir}/final/ --save_mem"
         ) + (f" --energy {energy}" if energy is not None else '')
