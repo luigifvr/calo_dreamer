@@ -73,7 +73,7 @@ def define_parser():
                         'in the first run for faster runtime in subsequent runs.')
     parser.add_argument('--mode', '-m', default='all',
                         choices=['all', 'no-cls', 'avg', 'avg-E', 'hist-p', 'hist-chi', 'hist',
-                                 'cls-low', 'cls-low-normed', 'cls-high'],
+                                 'cls-low', 'cls-low-normed', 'cls-high', 'all-cls'],
                         help=("What metric to evaluate: " +\
                               "'avg' plots the shower average;" +\
                               "'avg-E' plots the shower average for energy ranges;" +\
