@@ -17,6 +17,7 @@
                    'hist-p': plots histograms of high-level features.
                    'hist-chi': computes the chi2 difference of the histograms.
                    'hist': plots histograms and computes chi2.
+                   'all-cls': only run classifiers in list_cls
                    'no-cls': does all of the above (no classifier).
                    'cls-low': trains a classifier on low-level features (voxels).
                    'cls-low-normed': trains a classifier on normalized voxels.
@@ -914,7 +915,7 @@ def main(raw_args=None):
         plot_cell_dist(shower, reference_shower, args)
         print("Plotting histograms: DONE. \n")
 
-    if args.mode in ['all', 'cls-low', 'cls-high', 'cls-low-normed']:
+    if args.mode in ['all', 'all-cls', 'cls-low', 'cls-high', 'cls-low-normed']:
         if args.mode in ['all', 'all-cls']:
             list_cls = ['cls-low', 'cls-high']
         else:
