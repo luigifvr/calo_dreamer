@@ -24,7 +24,7 @@ plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
  
 def plot_layer_comparison(hlf_class, data, reference_class, reference_data,
-                          arg, input_name, show=False):
+                          arg, input_name='', show=False):
     """ plots showers of of data and reference next to each other, for comparison """
 
     filename = os.path.join(arg.output_dir,

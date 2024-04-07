@@ -402,7 +402,7 @@ def save_reference(ref_hlf, fname):
         pickle.dump(ref_hlf, file)
     print("Saving file with high-level features DONE.")
 
-def plot_histograms(hlf_classes, reference_class, arg, labels, input_names, p_label):
+def plot_histograms(hlf_classes, reference_class, arg, labels, input_names='', p_label=''):
     """ plots histograms based with reference file as comparison """
     plot_Etot_Einc(hlf_classes, reference_class, arg, labels, input_names, p_label)
     plot_E_layers(hlf_classes, reference_class, arg, labels, input_names, p_label)
@@ -649,8 +649,8 @@ def run_from_py(sample, energy, doc, params):
         else:
             p_label = r'$e^{+}$ DS-3'
 
-        plot_histograms(hlf, reference_hlf, args, labels, ['',], )
-        plot_cell_dist(sample, reference_shower, args)
+        plot_histograms([hlf,], reference_hlf, args, labels, ['',], )
+        plot_cell_dist([sample,], reference_shower, args)
         print("Plotting histograms: DONE. \n")
     
     if args.mode in ['all', 'all-cls', 'cls-low', 'cls-high', 'cls-low-normed']:
