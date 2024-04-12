@@ -761,7 +761,7 @@ def main(raw_args=None):
                        '2': 0.5e-3/0.033, '3': 0.5e-3/0.033}[args.dataset]
 
     # get the path of all  the input files to be evaluated
-    list_inputs = glob(args.input_file+'/*samples.hdf5')
+    list_inputs = glob(args.input_file+'/*samples*.hdf5')
     showers = []
     energies = []
     hlfs = []
@@ -804,10 +804,13 @@ def main(raw_args=None):
     #    reference_hlf = load_reference(os.path.join(args.source_dir,
     #                                                args.reference_file_name + '.pkl'))
     #else:
+    print(f'{args.mode=}')
     print("Computing .pkl reference")
     reference_hlf = HLF.HighLevelFeatures(particle,
                                               filename='src/challenge_files/binning_dataset_{}.xml'.format(
                                                   args.dataset.replace('-', '_')))
+
+    print('Loaded HLF object')
     reference_hlf.Einc = reference_energy
     #save_reference(reference_hlf,
     #                 os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
@@ -929,7 +932,9 @@ def main(raw_args=None):
         plot_cell_dist(showers, reference_shower, args, labels, input_names, p_label)
         print("Plotting histograms: DONE. \n")
 
+    print('at classification branch')
     if args.mode in ['all', 'all-cls', 'cls-low', 'cls-high', 'cls-low-normed']:
+        print('in classification branch')
         if args.mode in ['all', 'all-cls']:
             list_cls = ['cls-low', 'cls-high']
         else:
