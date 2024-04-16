@@ -650,7 +650,7 @@ def run_from_py(sample, energy, doc, params):
             p_label = r'$e^{+}$ DS-3'
 
         plot_histograms([hlf,], reference_hlf, args, labels, ['',], )
-        plot_cell_dist([sample,], reference_shower, args)
+        plot_cell_dist([sample,], reference_shower, args, labels, ['',], p_label)
         print("Plotting histograms: DONE. \n")
     
     if args.mode in ['all', 'all-cls', 'cls-low', 'cls-high', 'cls-low-normed']:
