@@ -62,7 +62,7 @@ plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
 #hardcoded labels for histograms
-labels = ['Geant', 'ViT', 'ARViT']
+labels = ['ViT', 'ARViT']
 
 ########## Parser Setup ##########
 

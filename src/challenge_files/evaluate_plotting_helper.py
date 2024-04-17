@@ -108,15 +108,21 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
     """ plots Etot normalized to Einc histogram """
 
     bins = np.linspace(0.5, 1.5, 31)
-    fig, ax = plt.subplots(2,1, figsize=(5, 4.5), gridspec_kw = {"height_ratios": (4,1), "hspace": 0.0}, sharex = True)
+    fig, ax = plt.subplots(3,1, figsize=(6, 5.5), gridspec_kw = {"height_ratios": (4,1,1), "hspace": 0.0}, sharex = True)
         
     counts_ref, bins = np.histogram(reference_class.GetEtot() / reference_class.Einc.squeeze(), bins=bins, density=False)
     counts_ref_norm = counts_ref/counts_ref.sum()
     geant_error = counts_ref_norm/np.sqrt(counts_ref)
+    geant_ratio_error = geant_error/counts_ref_norm
+    geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+    geant_ratio_error[geant_ratio_error_isnan] = 0.
+    geant_delta_err = geant_ratio_error*100
     ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                    alpha=0.8, linewidth=1.0, color='k', where='post')
     ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
     ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+    ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
     for i in range(len(hlfs)):
         counts, _ = np.histogram(hlfs[i].GetEtot() / hlfs[i].Einc.squeeze(), bins=bins, density=False)
         counts_data, bins = np.histogram(hlfs[i].GetEtot() / hlfs[i].Einc.squeeze(), bins=bins, density=False)
@@ -128,9 +134,18 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
         ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
     
         ratio = counts_data / counts_ref
+        ratio_err = y_ref_err/counts_ref_norm
+        ratio_isnan = np.isnan(ratio)
+        ratio[ratio_isnan] = 1.
+        ratio_err[ratio_isnan] = 0.
         ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-        ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
-
+        ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+        delta = np.fabs(ratio - 1)*100
+        delta_err = ratio_err*100
+        markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                    yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                    linewidth=1.0, fmt=".", capsize=2)
+ 
         seps = _separation_power(counts_ref_norm, counts_data_norm, None)
         print("Separation power of Etot / Einc histogram: {}".format(seps))
         with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -146,7 +161,18 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
 
     ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
     ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-    
+             
+    ax[2].set_ylim((0.05, 20))
+    ax[2].set_yscale("log")
+    ax[2].set_yticks([0.1, 1.0, 10.0])
+    ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+    ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+    ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+    ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+    ax[2].set_ylabel(r"$\delta [\%]$")
+   
     ax[1].set_xlabel(r'$E_{\text{tot}} / E_{\text{inc}}$')
     ax[0].set_ylabel(r'a.u.')
     ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
@@ -163,7 +189,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 arg.dataset))
     with PdfPages(filename) as pdf:
         for key in reference_class.GetElayers().keys():
-            fig, ax = plt.subplots(2, 1, figsize=(5, 4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6, 5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             if arg.x_scale == 'log':
                 bins = np.logspace(np.log10(arg.min_energy),
                                    np.log10(reference_class.GetElayers()[key].max()),
@@ -174,10 +200,16 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             counts_ref, bins = np.histogram(reference_class.GetElayers()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
-            ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[1].fill_between(bins, dup(1-geant_ratio_error), dup(1+geant_ratio_error), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(hlfs[i].GetElayers()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(hlfs[i].GetElayers()[key], bins=bins, density=False)
@@ -188,8 +220,18 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                    
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
                     
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of E layer {} histogram: {}".format(key, seps))
@@ -206,7 +248,18 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
 
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-     
+            
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
             #ax[0].set_title("Energy deposited in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
@@ -230,16 +283,22 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 lim = (-500., 500.)
             else:
                 lim = (-100., 100.)
-            fig, ax = plt.subplots(2, 1, figsize=(5, 4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6, 5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 51)
 
             counts_ref, bins = np.histogram(reference_class.GetECEtas()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(hlfs[i].GetECEtas()[key], bins=bins, density=False)
@@ -251,8 +310,19 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
+
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+                
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 
                 print("Separation power of EC Eta layer {} histogram: {}".format(key, seps))
@@ -269,7 +339,18 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
 
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-     
+            
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
             #ax[0].set_title(r"Center of Energy in $\Delta\eta$ in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(f'$\\langle\\eta\\rangle_{{{key}}}$ [mm]')
@@ -294,16 +375,22 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 lim = (-500., 500.)
             else:
                 lim = (-100., 100.)
-            fig, ax = plt.subplots(2, 1, figsize=(5, 4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6, 5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 51)
             
             counts_ref, bins = np.histogram(reference_class.GetECPhis()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(hlfs[i].GetECPhis()[key], bins=bins, density=False)
@@ -315,8 +402,20 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
+
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+ 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of EC Phi layer {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -332,7 +431,18 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
 
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-     
+            
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
             #ax[0].set_title(r"Center of Energy in $\Delta\phi$ in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(f"$\\langle\\phi\\rangle_{{{key}}}$ [mm]")
@@ -357,16 +467,22 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 lim = (0., 400.)
             else:
                 lim = (0., 100.)
-            fig, ax = plt.subplots(2,1, figsize=(5, 4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3,1, figsize=(6, 5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 51)
             
             counts_ref, bins = np.histogram(reference_class.GetWidthEtas()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(hlfs[i].GetWidthEtas()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(hlfs[i].GetWidthEtas()[key], bins=bins, density=False)
@@ -378,9 +494,20 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
+
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
-                    
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+      
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of Width Eta layer {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -397,6 +524,17 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+           
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(r"$\sigma_{\langle\eta\rangle_{" + str(key) + "}}$ [mm]")
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
@@ -421,16 +559,22 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 lim = (0., 400.)
             else:
                 lim = (0., 100.)
-            fig, ax = plt.subplots(2, 1, figsize=(5, 4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6, 5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 51)
             
             counts_ref, bins = np.histogram(reference_class.GetWidthPhis()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(hlfs[i].GetWidthPhis()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(hlfs[i].GetWidthPhis()[key], bins=bins, density=False)
@@ -442,9 +586,20 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
-                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
 
+                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+ 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of Width Phi layer {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -461,6 +616,17 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(r"$\sigma_{\langle\phi\rangle_{" + str(key) + "}}$ [mm]")
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
@@ -483,16 +649,20 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(g*len(reference_hlf.relevantLayers)/l,
                                (g+1)*len(reference_hlf.relevantLayers)/l, 40)
-            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             counts_ref, bins = np.histogram(func_ref[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
-            
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
-
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for j, file in enumerate(hlfs):
                 func_hlf = hlfs[j].GetWeightedDepthR() if l==1 else hlfs[j].GetGroupedWeightedDepthR()
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
@@ -505,9 +675,20 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[j], alpha=0.2)
             
                 ratio = counts_data / counts_ref
-                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[j], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[j], alpha=0.2)
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
 
+                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[j], where='post')
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[j], alpha=0.2)
+
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[j], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+ 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of Weighted depth slice {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -523,7 +704,18 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-            
+                
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+ 
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(r"$\bar{s}_{"+str(key)+"}$")
             #ax[0].set_xlim(*lim)
@@ -547,16 +739,20 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(g*len(reference_class.relevantLayers)/l,
                                (g+1)*len(reference_class.relevantLayers)/l, 40)
-            fig, ax = plt.subplots(2, 1, figsize=(6,6), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             counts_ref, bins = np.histogram(func_ref[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
-            
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
-
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for j, file in enumerate(hlfs):
                 func_hlf = hlfs[j].GetWeightedDepthA() if l==1 else hlfs[j].GetGroupedWeightedDepthA()
                 counts, _ = np.histogram(func_hlf[key], bins=bins, density=False)
@@ -569,9 +765,20 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[j], alpha=0.2)
             
                 ratio = counts_data / counts_ref
-                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[j], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[j], alpha=0.2)
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
 
+                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[j], where='post')
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[j], alpha=0.2)
+
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[j], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+ 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of Weighted depth ring {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -587,7 +794,18 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
             
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-            
+                        
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+ 
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(r"$\bar{s}_{"+str(key)+"}$")
             #ax[0].set_xlim(*lim)
@@ -608,16 +826,22 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
     with PdfPages(filename) as pdf:
         for key in reference_class.GetSparsity().keys():
             lim = (0, 1)
-            fig, ax = plt.subplots(2, 1, figsize=(5,4.5), gridspec_kw={"height_ratios": (4,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 20)
             
             counts_ref, bins = np.histogram(1-reference_class.GetSparsity()[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
+            geant_ratio_error = geant_error/counts_ref_norm
+            geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+            geant_ratio_error[geant_ratio_error_isnan] = 0.
+            geant_delta_err = geant_ratio_error*100
             ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+            ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
             for i in range(len(hlfs)):
                 counts, _ = np.histogram(1-hlfs[i].GetSparsity()[key], bins=bins, density=False)
                 counts_data, bins = np.histogram(1-hlfs[i].GetSparsity()[key], bins=bins, density=False)
@@ -629,9 +853,20 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[0].fill_between(bins, dup(counts_data_norm+y_ref_err), dup(counts_data_norm-y_ref_err), step='post', color=colors[i], alpha=0.2)
             
                 ratio = counts_data / counts_ref
-                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
-                ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref_norm), dup(ratio+y_ref_err/counts_ref_norm), step='post', color=colors[i], alpha=0.2)
+                ratio_err = y_ref_err/counts_ref_norm
+                ratio_isnan = np.isnan(ratio)
+                ratio[ratio_isnan] = 1.
+                ratio_err[ratio_isnan] = 0.
 
+                ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
+                ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
+                
+                delta = np.fabs(ratio - 1)*100
+                delta_err = ratio_err*100
+                markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                        yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                        linewidth=1.0, fmt=".", capsize=2)
+ 
                 seps = _separation_power(counts_ref_norm, counts_data_norm, None)
                 print("Separation power of Sparsity layer {} histogram: {}".format(key, seps))
                 with open(os.path.join(arg.output_dir, 'histogram_chi2_{}_{}.txt'
@@ -647,7 +882,18 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
 
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-            
+             
+            ax[2].set_ylim((0.05, 20))
+            ax[2].set_yscale("log")
+            ax[2].set_yticks([0.1, 1.0, 10.0])
+            ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+            ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+            ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            ax[2].set_ylabel(r"$\delta [\%]$")
+
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_xlabel(f"$\\lambda_{{{key}}}$")
