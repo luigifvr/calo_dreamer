@@ -62,7 +62,7 @@ plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
 #hardcoded labels for histograms
-labels = ['ViT', 'ARViT']
+labels = ['ViT', 'latViT']
 
 ########## Parser Setup ##########
 
@@ -848,7 +848,7 @@ def main(raw_args=None):
             print("Plotting average shower: DONE.\n")
 
             print("Plotting randomly selected reference and generated shower: ")
-            hlfs[n].DrawSingleShower(shower[:5], 
+            hlfs[n].DrawSingleShower(showers[n][:5], 
                                  filename=os.path.join(args.output_dir,
                                                         'single_shower_dataset_{}_{}.png'.format(
                                                                 args.dataset, input_name)),
@@ -893,7 +893,7 @@ def main(raw_args=None):
                     #save_reference(reference_hlf,
                     #               os.path.join(args.source_dir, args.reference_file_name + '.pkl'))
 
-            reference_hlf.DrawAverageShower(reference_hlf.avg_shower_E[target_energies[i]],
+                reference_hlf.DrawAverageShower(reference_hlf.avg_shower_E[target_energies[i]],
                                 filename=os.path.join(args.output_dir,
                                                         'reference_'+filename),
                                 title='reference '+plot_title[i])

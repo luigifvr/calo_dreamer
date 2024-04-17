@@ -16,7 +16,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 dup = lambda a: np.append(a, a[-1])
 # settings for the various plots. These should be larger than the number of hlf files
-colors = ["tab:blue", "tab:orange"]
+colors = ["#1F449C", "#F05039"]
 
 plt.rc("font", family="serif", size=20)
 plt.rc("axes", titlesize="medium")
@@ -170,13 +170,13 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
     ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-    ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+    #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
     ax[2].set_ylabel(r"$\delta [\%]$")
    
-    ax[1].set_xlabel(r'$E_{\text{tot}} / E_{\text{inc}}$')
+    ax[2].set_xlabel(r'$E_{\text{tot}} / E_{\text{inc}}$')
     ax[0].set_ylabel(r'a.u.')
     ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-    ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+    ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
     filename = os.path.join(arg.output_dir, 'Etot_Einc_dataset_{}.pdf'
                             .format(arg.dataset))
@@ -257,16 +257,16 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
             #ax[0].set_title("Energy deposited in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[1].set_xlabel(f'$E_{{{key}}}$ [MeV]')
+            ax[2].set_xlabel(f'$E_{{{key}}}$ [MeV]')
             ax[0].set_yscale('log'), ax[0].set_xscale('log')
             ax[1].set_xscale('log')
-            ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='lower right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, dpi=300, format='pdf')
             plt.close()
@@ -348,16 +348,16 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
             #ax[0].set_title(r"Center of Energy in $\Delta\eta$ in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(f'$\\langle\\eta\\rangle_{{{key}}}$ [mm]')
+            ax[2].set_xlabel(f'$\\langle\\eta\\rangle_{{{key}}}$ [mm]')
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, title_fontsize=15, fontsize=15)
+            ax[0].legend(loc='lower center', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -440,16 +440,16 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
             #ax[0].set_title(r"Center of Energy in $\Delta\phi$ in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(f"$\\langle\\phi\\rangle_{{{key}}}$ [mm]")
+            ax[2].set_xlabel(f"$\\langle\\phi\\rangle_{{{key}}}$ [mm]")
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, title_fontsize=15, fontsize=15)
+            ax[0].legend(loc='lower center', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -532,16 +532,16 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
            
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(r"$\sigma_{\langle\eta\rangle_{" + str(key) + "}}$ [mm]")
+            ax[2].set_xlabel(r"$\sigma_{\langle\eta\rangle_{" + str(key) + "}}$ [mm]")
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
      
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -624,16 +624,16 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(r"$\sigma_{\langle\phi\rangle_{" + str(key) + "}}$ [mm]")
+            ax[2].set_xlabel(r"$\sigma_{\langle\phi\rangle_{" + str(key) + "}}$ [mm]")
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -713,15 +713,15 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
  
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(r"$\bar{s}_{"+str(key)+"}$")
+            ax[2].set_xlabel(r"$d_{\alpha_{"+str(key)+"}}$")
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(reference_hlf.num_alpha[0]) == 0:
                 g += 1
@@ -803,15 +803,15 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
  
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(r"$\bar{s}_{"+str(key)+"}$")
+            ax[2].set_xlabel(r"$d_{r_{"+str(key)+"}}$")
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc=(0.57, 0.54), frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(len(reference_class.r_edges[0])-1)==0:
                 g += 1
@@ -861,7 +861,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
                 ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
                 
-                delta = np.fabs(ratio - 1)*100
+delta = np.fabs(ratio - 1)*100
                 delta_err = ratio_err*100
                 markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
                                         yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
@@ -891,15 +891,15 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                                2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
-            ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
+            #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_xlabel(f"$\\lambda_{{{key}}}$")
+            ax[2].set_xlabel(f"$\\lambda_{{{key}}}$")
             #plt.yscale('log')
             ax[1].set_xlim(*lim)
-            ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=15, title_fontsize=15)
+            ax[0].legend(loc='upper center', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
             fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, format='pdf')
             plt.close()
@@ -915,12 +915,23 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         bins = 50
 
     counts_ref, bins = np.histogram(ref_shower_arr, bins=bins, density=True)
-    ax[0].step(bins, dup(counts_ref), label='GEANT', linestyle='-',
+    counts_ref_norm = counts_ref/counts_ref.sum()
+    geant_error = counts_ref_norm/np.sqrt(counts_ref)
+    geant_ratio_error = geant_error/counts_ref_norm
+    geant_ratio_error_isnan = np.isnan(geant_ratio_error)
+    geant_ratio_error[geant_ratio_error_isnan] = 0.
+    geant_delta_err = geant_ratio_error*100
+    ax[0].step(bins, dup(counts_ref_norm), label='GEANT', linestyle='-',
                         alpha=0.8, linewidth=1.0, color='k', where='post')
- 
+    ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
+    ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
+    ax[2].errorbar((bins[:-1]+bins[1:])/2, np.zeros_like(bins[:-1]), yerr=geant_delta_err, ecolor='grey',
+                           color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
     for i in range(len(list_showers)):
         counts, _ = np.histogram(list_showers[i].flatten(), bins=bins, density=False)
         counts_data, bins = np.histogram(list_showers[i].flatten(), bins=bins, density=True)
+
+        counts_data_norm = counts_data/counts_data.sum()
         ax[0].step(bins, dup(counts_data), label=labels[i], where='post',
                    linewidth=1.5, alpha=1., color=colors[i], linestyle='-')
 
@@ -928,9 +939,19 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
         ax[0].fill_between(bins, dup(counts_data+y_ref_err), dup(counts_data-y_ref_err), step='post', color=colors[i], alpha=0.2)
     
         ratio = counts_data / counts_ref
+        ratio_err = y_ref_err/counts_ref_norm
+        ratio_isnan = np.isnan(ratio)
+        ratio[ratio_isnan] = 1.
+        ratio_err[ratio_isnan] = 0.
+
         ax[1].step(bins, dup(ratio), linewidth=1.5, alpha=1.0, color=colors[i], where='post')
         ax[1].fill_between(bins, dup(ratio-y_ref_err/counts_ref), dup(ratio+y_ref_err/counts_ref), step='post', color=colors[i], alpha=0.2)
-
+        delta = np.fabs(ratio - 1)*100
+        delta_err = ratio_err*100
+        markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
+                                yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
+                                linewidth=1.0, fmt=".", capsize=2)
+ 
         seps = _separation_power(counts_ref, counts_data, bins)
         print("Separation power of voxel distribution histogram: {}".format(seps))
         with open(os.path.join(arg.output_dir,
@@ -946,9 +967,15 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
 
     ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
     ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
- 
-    ax[0].set_title(r"Voxel energy distribution")
-    ax[1].set_xlabel(r'$E$ [MeV]')
+    ax[2].set_ylim((0.05, 20))
+    ax[2].set_yscale("log")
+    ax[2].set_yticks([0.1, 1.0, 10.0])
+    ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+    ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                    2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+
+    #ax[0].set_title(r"Voxel energy distribution")
+    ax[2].set_xlabel(r'$E$ [MeV]')
     ax[0].set_yscale('log')
     if arg.x_scale == 'log':
         ax[1].set_xscale('log')
