@@ -414,8 +414,8 @@ def plot_histograms(hlf_classes, reference_class, arg, labels, input_names='', p
     plot_weighted_depth_a(hlf_classes, reference_class, arg, labels, input_names, p_label)
     plot_weighted_depth_r(hlf_classes, reference_class, arg, labels, input_names, p_label)
     # grouped
-    plot_weighted_depth_a(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
-    plot_weighted_depth_r(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
+    #plot_weighted_depth_a(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
+    #plot_weighted_depth_r(hlf_classes, reference_class, arg, labels, input_names, p_label, l=9)
     # no dataset 1 results
     #if arg.dataset[0] == '1':
     #    plot_Etot_Einc_discrete(hlf_class, reference_class, arg)
