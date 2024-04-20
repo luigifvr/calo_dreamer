@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from einops import rearrange
-from einops.layers.torch import Rearrange
+from torch.utils.checkpoint import checkpoint
 from timm.models.vision_transformer import Mlp
 
 class ViT(nn.Module):
@@ -35,7 +35,8 @@ class ViT(nn.Module):
             'causal_attn': False,
             'final_conv': False,
             'final_conv_channels': None,
-            'long_skips': False
+            'long_skips': False,
+            'checkpoint_grads': False
         }
 
         for k, p in defaults.items():
@@ -167,7 +168,10 @@ class ViT(nn.Module):
         N = (len(self.blocks)+1)//2 - 1 # for long skips
         residuals = []                  # for long skips
         for i, block in enumerate(self.blocks):
-            x = block(x, c) # (B, T, D)
+            if self.checkpoint_grads:
+                x = checkpoint(block, x, c, use_reentrant=False)
+            else:
+                x = block(x, c) # (B, T, D)
             if self.long_skips:
                 if i < N:
                     residuals.append(x)
