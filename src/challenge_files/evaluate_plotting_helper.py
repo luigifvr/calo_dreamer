@@ -861,7 +861,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
                 ax[1].step(bins, dup(ratio), linewidth=1.0, alpha=1.0, color=colors[i], where='post')
                 ax[1].fill_between(bins, dup(ratio-ratio_err), dup(ratio+ratio_err), step='post', color=colors[i], alpha=0.2)
                 
-delta = np.fabs(ratio - 1)*100
+                delta = np.fabs(ratio - 1)*100
                 delta_err = ratio_err*100
                 markers, caps, bars = ax[2].errorbar((bins[:-1]+bins[1:])/2, delta,
                                         yerr=delta_err, ecolor=colors[i], elinewidth=0.5,
