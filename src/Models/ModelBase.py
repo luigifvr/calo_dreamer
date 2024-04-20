@@ -458,6 +458,10 @@ class GenerativeModel(nn.Module):
                 params=self.params,
             )
         else:
+            if self.latent:
+                #save generated latent space
+                self.save_sample(samples, conditions, name=name+'_latent', doc=doc) 
+                    
             # postprocess
             for fn in transforms[::-1]:
                 samples, conditions = fn(samples, conditions, rev=True)
