@@ -16,9 +16,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 dup = lambda a: np.append(a, a[-1])
 # settings for the various plots. These should be larger than the number of hlf files
-colors = ["#0053cf", "#F05039"]
+colors = ["#0000cc", "#b40000"]
 
-plt.rc("font", family="serif", size=20)
+plt.rc("font", family="serif", size=22)
 plt.rc("axes", titlesize="medium")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath}")
 plt.rc("text", usetex=True)
@@ -98,7 +98,7 @@ def plot_Etot_Einc_discrete(hlf_class, reference_class, arg):
             f.write('\n\n')
         h, l = ax.get_legend_handles_labels()
     ax = plt.subplot(4, 4, 16)
-    ax.legend(h, l, loc='center', fontsize=20)
+    ax.legend(h, l, loc='center', fontsize=18)
     ax.axis('off')
     filename = os.path.join(arg.output_dir, 'Etot_Einc_dataset_{}_E_i.pdf'.format(arg.dataset))
     plt.savefig(filename, dpi=300, format='pdf')
@@ -162,12 +162,12 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
     ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
     ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
              
-    ax[2].set_ylim((0.05, 20))
+    ax[2].set_ylim((0.05, 50))
     ax[2].set_yscale("log")
     ax[2].set_yticks([0.1, 1.0, 10.0])
     ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
     ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
     ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
     #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -176,7 +176,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
     ax[2].set_xlabel(r'$E_{\text{tot}} / E_{\text{inc}}$')
     ax[0].set_ylabel(r'a.u.')
     ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-    ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+    ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
     filename = os.path.join(arg.output_dir, 'Etot_Einc_dataset_{}.pdf'
                             .format(arg.dataset))
@@ -249,12 +249,12 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -266,7 +266,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[2].set_xlabel(f'$E_{{{key}}}$ [MeV]')
             ax[0].set_yscale('log'), ax[0].set_xscale('log')
             ax[1].set_xscale('log')
-            ax[0].legend(loc='lower right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='lower right', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, dpi=300, format='pdf')
             plt.close()
@@ -340,12 +340,12 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -357,7 +357,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=20)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -432,12 +432,12 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -449,7 +449,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=20)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, title_fontsize=20, fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -524,12 +524,12 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -541,7 +541,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
      
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -616,12 +616,12 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
             
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -633,7 +633,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
             plt.savefig(pdf, dpi=300, format='pdf')
@@ -649,7 +649,7 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(g*len(reference_hlf.relevantLayers)/l,
                                (g+1)*len(reference_hlf.relevantLayers)/l, 40)
-            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(5.5,5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             counts_ref, bins = np.histogram(func_ref[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
@@ -705,12 +705,12 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
                 
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -721,7 +721,7 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(reference_hlf.num_alpha[0]) == 0:
                 g += 1
@@ -739,7 +739,7 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
         for n, key in enumerate(func_ref.keys()):
             bins = np.linspace(g*len(reference_class.relevantLayers)/l,
                                (g+1)*len(reference_class.relevantLayers)/l, 40)
-            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(5.5,5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             counts_ref, bins = np.histogram(func_ref[key], bins=bins, density=False)
             counts_ref_norm = counts_ref/counts_ref.sum()
             geant_error = counts_ref_norm/np.sqrt(counts_ref)
@@ -795,12 +795,12 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
                         
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -811,7 +811,7 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
             ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{GEANT}}$')
-            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(len(reference_class.r_edges[0])-1)==0:
                 g += 1
@@ -826,7 +826,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
     with PdfPages(filename) as pdf:
         for key in reference_class.GetSparsity().keys():
             lim = (0, 1)
-            fig, ax = plt.subplots(3, 1, figsize=(6,5.5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
+            fig, ax = plt.subplots(3, 1, figsize=(5.5,5), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
             bins = np.linspace(*lim, 20)
             
             counts_ref, bins = np.histogram(1-reference_class.GetSparsity()[key], bins=bins, density=False)
@@ -883,12 +883,12 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
             ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
              
-            ax[2].set_ylim((0.05, 20))
+            ax[2].set_ylim((0.05, 50))
             ax[2].set_yscale("log")
             ax[2].set_yticks([0.1, 1.0, 10.0])
             ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
             ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                               2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                               2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
 
             ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -899,7 +899,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[2].set_xlabel(f"$\\lambda_{{{key}}}$")
             #plt.yscale('log')
             ax[1].set_xlim(*lim)
-            ax[0].legend(loc='upper center', frameon=False, title=p_label, handlelength=1.5, fontsize=20, title_fontsize=20)
+            ax[0].legend(loc='upper center', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
             fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             plt.savefig(pdf, format='pdf')
             plt.close()
@@ -968,12 +968,12 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
 
     ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
     ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
-    ax[2].set_ylim((0.05, 20))
+    ax[2].set_ylim((0.05, 50))
     ax[2].set_yscale("log")
     ax[2].set_yticks([0.1, 1.0, 10.0])
     ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
     ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
-                    2., 3., 4., 5., 6., 7., 8., 9.], minor=True)
+                    2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
     
     ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
     #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
@@ -986,8 +986,8 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     if arg.x_scale == 'log':
         ax[1].set_xscale('log')
     #plt.xlim(*lim)
-    ax[0].legend(loc='best', frameon=False, title=p_label)
-    fig.tight_layout()
+    ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.5, fontsize=18, title_fontsize=20)
+    fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
     filename = os.path.join(arg.output_dir,
                                 'voxel_energy_dataset_{}.pdf'.format(arg.dataset))
     plt.savefig(filename, dpi=300, format='pdf')

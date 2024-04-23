@@ -91,7 +91,7 @@ class HighLevelFeatures:
         fraction = int(n_layers/ngroups)
         for l in self.relevantLayers[k*fraction:(k+1)*fraction]:
             data_l = energy_calo[:, self.bin_edges[l]:self.bin_edges[l+1]]
-            energy_sum = data_l[:, edge_idx::self.num_alpha[0]].sum(axis=-1)
+            energy_sum = data_l[:, edge_idx::(len(self.r_edges[0])-1)].sum(axis=-1)
             total_energy += energy_sum
             weighted_s += self._calculate_WeightedDepth(energy_sum, l)
         return weighted_s/(total_energy+1.e-8)

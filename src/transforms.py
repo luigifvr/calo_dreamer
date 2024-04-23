@@ -385,6 +385,23 @@ class CutValues(object):
             transformed = shower
         return transformed, energy        
 
+class CutBothValues(object):
+    def __init__(self, cut=0.):
+        self.cut = cut
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            mask = (shower <= self.cut)
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        return transformed, energy        
+
 class ZeroMask(object):
     """
     Masks voxels to zero in the reverse transformation
