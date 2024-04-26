@@ -1,4 +1,4 @@
-run_name: BespokeMidpoint_1_largebatch
+run_name: BespokeMidpoint_4_rk2gt
 dtype: float32
 
 # Data
@@ -6,20 +6,24 @@ shape: [1, 45, 16, 9]
 
 # Solver
 model: BespokeMidpoint
-num_steps: 1 # number of integration steps (NFE varies with base solver)
-truth_tols: # setting for the dopri5 'truth' solver
-  atol: 1.e-5
-  rtol: 1.e-5
+num_steps: 4 # number of integration steps (NFE varies with base solver)
+truth_kwargs: # setting for the dopri5 'truth' solver
+  method: midpoint
+  options:
+    step_size: 0.01
+  # atol: 1.e-5 # dopri
+  # rtol: 1.e-5 # dopri
 
 # Flow model
-shape_model: /home/aore/calo_dreamer/results/d2_submit_shape
+shape_model: /remote/gpu06/favaro/temp/calodream_models/d2_shape_model_ViT_full_data_wrescale_submission
 
 # Training
 loss: gte
 iterations: 5000
-batch_size: 1000
-lr: 1.e-3
+batch_size: 500
+lr: 2.e-3
 loss_window: 250
+checkpoint_grads: False
 
 # Evaluation
 batch_size_sample: 100

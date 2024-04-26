@@ -26,14 +26,14 @@ class BespokeSolver(nn.Module):
     __init__(params, device, doc):
         
         params: A dictionary specifying the parameters of the solver:
-            flow       -- Path to a flow model representing the vector field to
-                       be integrated. It should have signature (x,t,c) --> x,
-                       where c is a possible condition.
-            num_steps  -- The number of integration steps to take.
-            shape      -- The shape of the state x
-            L_tau      -- The Lipschitz contant hyperparameter # TODO: explain better
-            truth_tols -- Settings for the atol and rtol parameters of the truth
-                       solver, passed as a dictionary.
+            flow         -- Path to a flow model representing the vector field to
+                         be integrated. It should have signature (x,t,c) --> x,
+                         where c is a possible condition.
+            num_steps    -- The number of integration steps to take.
+            shape        -- The shape of the state x
+            L_tau        -- The Lipschitz contant hyperparameter # TODO: explain better
+            truth_kwargs -- Dictionary of keyword arguments passed to `odeint` for the
+                         gound truth solver
         device: The device on which to store model parameters and flow network.
         doc: A Documenter object used for logging and saving outputs
     """
@@ -48,9 +48,10 @@ class BespokeSolver(nn.Module):
         self.flow_dir = params['shape_model']
         self.num_steps = params['num_steps']
         self.L_tau = params.get('L_tau', 1.)
-        self.truth_tols = params.get('truth_tols', None)
-
+        self.truth_kwargs = params.get('truth_kwargs', None)
         self.loss = params.get('loss', 'gte_bound')
+        self.checkpoint_grads = params.get('checkpoint_grads', False)
+
         self.init_params()
         self.load_flow_models()
         self.cast_shape = [-1] + [1]*(1+len(self.shape))
@@ -153,17 +154,22 @@ class BespokeSolver(nn.Module):
         f = lambda t, x: self.flow_fn(x, t, cond)
         x0 = torch.randn((batch_size, *self.shape), device=self.device)
 
-        if self.loss == 'gte':
+        if self.loss in ['gte', 'log_gte']:
             t_sol = torch.tensor(
                 [0, 1], dtype=torch.float32, device=self.device
             )
             with torch.inference_mode():
-                x_true = odeint(f, x0, t_sol, **self.truth_tols)[-1]
-            return self.gte_loss(x_true, x0, cond)
+                x_true = odeint(f, x0, t_sol, **self.truth_kwargs)[-1]
+
+            loss = self.gte_loss(x_true, x0, cond)
+            if self.loss == 'log_gte':
+                loss = -loss.log()
+
+            return loss
         
         with torch.inference_mode():
             t_stop = self.t_sol.detach()
-            x_true = odeint(f, x0, t_stop, **self.truth_tols)
+            x_true = odeint(f, x0, t_stop, **self.truth_kwargs)
             vel =  f(t_stop, x_true)
         x_aux = x_true + vel*(self.t_sol - t_stop).view(*self.cast_shape)
         
@@ -201,6 +207,8 @@ class BespokeSolver(nn.Module):
         # read flow parameters
         flow_params = load_params(os.path.join(self.flow_dir, 'params.yaml'))
         flow_params['eval_mode'] = self.params.get('eval_mode', 'all')
+        flow_params['checkpoint_grads'] = self.checkpoint_grads
+
         # initialioze flow
         flow_doc = Documenter(None, existing_run=self.flow_dir, read_only=True)
         self.flow = TBD(flow_params, self.device, flow_doc)
