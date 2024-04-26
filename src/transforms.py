@@ -371,13 +371,16 @@ class CutValues(object):
     """
     Cut in Normalized space
         cut: threshold value for the cut
+        n_layers: number of layers to avoid cutting on the us
     """
-    def __init__(self, cut=0.):
+    def __init__(self, cut=0., n_layers=45):
         self.cut = cut
+        self.n_layers = n_layers
 
     def __call__(self, shower, energy, rev=False):
         if rev:
             mask = (shower <= self.cut)
+            mask[:, -self.n_layers:] = False
             transformed = shower
             if self.cut:
                 transformed[mask] = 0.0 
@@ -492,11 +495,12 @@ class NormalizeByElayer(object):
        layer_boundaries: ''
        eps: numerical epsilon
     """
-    def __init__(self, ptype, xml_file, eps=1.e-10):
+    def __init__(self, ptype, xml_file, cut=0.0, eps=1.e-10):
         self.eps = eps
         self.xml = XMLHandler.XMLHandler(xml_file, ptype)
         self.layer_boundaries = np.unique(self.xml.GetBinEdges())
         self.n_layers = len(self.layer_boundaries) - 1
+        self.cut = cut
 
     def __call__(self, shower, energy, rev=False):
         if rev:
@@ -530,6 +534,8 @@ class NormalizeByElayer(object):
             for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
                 layer = shower[:, start:end] # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps # normalize to unity
+                mask = (layer <= self.cut)
+                layer[mask] = 0.0 # apply normalized cut
                 transformed[:, start:end] = layer * layer_Es[:,[l]] # scale to layer energy
 
         else:
