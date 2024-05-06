@@ -15,7 +15,7 @@ from Util.util import load_params
 
 FIXED_SOLVERS = ['euler', 'midpoint', 'rk4']
 ADAPTIVE_SOLVERS = ['dopri5']
-BESPOKE_SOLVERS = ['BespokeEuler', 'BespokeMidpoint']
+BESPOKE_SOLVERS = ['BespokeEuler', 'BespokeMidpoint', 'BespokeNonStationary']
 solver_choices = FIXED_SOLVERS + ADAPTIVE_SOLVERS + BESPOKE_SOLVERS
 
 parser = ArgumentParser()

@@ -480,7 +480,7 @@ class BespokeMidpoint(BespokeSolver):
         """Returns integer-index time steps for the truth trajectory."""
         return self.t[::2]
 
-class BNSSolver(BespokeSolver):
+class BespokeNonStationary(BespokeSolver):
 
     """
     __init__(params, device, doc):

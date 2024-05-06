@@ -1,29 +1,31 @@
-run_name: BespokeMidpoint_4_rk2gt
+run_name: BNS_32
 dtype: float32
 
 # Data
 shape: [1, 45, 16, 9]
 
 # Solver
-model: BespokeMidpoint
-num_steps: 4 # number of integration steps (NFE varies with base solver)
+model: BNSSolver
+num_steps: 32 # number of integration steps (NFE varies with base solver)
 truth_kwargs: # setting for the dopri5 'truth' solver
   method: midpoint
   options:
     step_size: 0.01
-  # atol: 1.e-5 # dopri
-  # rtol: 1.e-5 # dopri
+  # atol: 1.e-4 # dopri
+  # rtol: 1.e-4 # dopri
 
 # Flow model
 shape_model: /remote/gpu06/favaro/temp/calodream_models/d2_shape_model_ViT_full_data_wrescale_submission
 
 # Training
-loss: gte
+loss: log_gte
 iterations: 5000
-batch_size: 500
-lr: 2.e-3
-loss_window: 250
+batch_size: 100
+lr: 5.e-4
+loss_window: 200
 checkpoint_grads: False
+buffer_len: 50
+buffer_rep: 4
 
 # Evaluation
 batch_size_sample: 100
