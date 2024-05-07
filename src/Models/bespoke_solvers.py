@@ -133,9 +133,13 @@ class BespokeSolver(nn.Module):
 
     def lte_loss(self, x, cond=None):
 
+        if self.params.get('model') == 'BespokeNonStationary':
+            solve_path = self.step_parallel(x[:-1], cond)
+        else:
+            solve_path = self.step(x[:-1], cond)
         # Eq. 24
         d = torch.sqrt(torch.mean(
-            (x[1:] - self.step(x[:-1], cond))**2, dim=list(range(2, x.ndim))
+            (x[1:] - solve_path)**2, dim=list(range(2, x.ndim))
         ))
         
         return d.sum(0)
@@ -276,7 +280,7 @@ class BespokeSolver(nn.Module):
         while it < self.iterations:
             
             # create condition loader:
-            if self.buffer_len is None:
+            if not self.buffer_len:
                 conds = online_cond_generator
             else:
                 sample_batch_size = self.buffer_len * batch_size # total paths in buffer
@@ -500,7 +504,7 @@ class BespokeNonStationary(BespokeSolver):
     def __init__(self, params, device, doc):
         
         super().__init__(params, device, doc)
-        assert self.loss in ['gte', 'log_gte']
+        assert self.loss in ['lte', 'gte', 'log_gte']
 
     def init_params(self):
         self.a = nn.ParameterList([
@@ -518,6 +522,14 @@ class BespokeNonStationary(BespokeSolver):
     def step(self, x0, xi, U, cond, i):
         U.append(self.flow_fn(xi, self.t[i], cond))
         return self.a[i] * x0 + torch.stack(U, -1) @ self.b[i]
+    
+    def step_parallel(self, xi, cond):
+        U = self.flow_fn(xi, self.t[:-1], cond)
+        path = [
+            self.a[i] * xi[0] + U[:i+1].movedim(0, -1) @ self.b[i]
+            for i in range(self.num_steps)
+        ]
+        return torch.stack(path)
 
     @property
     def t(self):
@@ -525,6 +537,11 @@ class BespokeNonStationary(BespokeSolver):
         t[1:-1] = self.theta_t.abs().cumsum(0) * self.h
         return t
 
+    @property
+    def t_sol(self):
+        """Returns integer-index time steps for the truth trajectory."""
+        return self.t          
+    
     def solve(self, cond=None, x0=None):
 
         if x0 is None: # assume initial state x0 follows standard normal
@@ -541,8 +558,7 @@ class BespokeNonStationary(BespokeSolver):
         print(f"train_model: Beginning training. Number of iterations set to {self.iterations}")
 
         trainable_parameters = [p for p in self.parameters() if p.requires_grad]
-        print(trainable_parameters)
-        print([w.shape for w in trainable_parameters])
+
         # initialize optimizer
         self.optimizer = torch.optim.Adam(
             trainable_parameters,
