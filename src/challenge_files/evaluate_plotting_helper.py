@@ -117,7 +117,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
     geant_ratio_error_isnan = np.isnan(geant_ratio_error)
     geant_ratio_error[geant_ratio_error_isnan] = 0.
     geant_delta_err = geant_ratio_error*100
-    ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+    ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                    alpha=0.8, linewidth=1.0, color='k', where='post')
     ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
     ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -175,7 +175,7 @@ def plot_Etot_Einc(hlfs, reference_class, arg, labels, input_names, p_label):
    
     ax[2].set_xlabel(r'$E_{\text{tot}} / E_{\text{inc}}$')
     ax[0].set_ylabel(r'a.u.')
-    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
     ax[0].legend(loc='best', frameon=False, title=p_label, handlelength=1.2, fontsize=16, title_fontsize=18)
     fig.tight_layout(pad=0.0, h_pad=0.0, w_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
     filename = os.path.join(arg.output_dir, 'Etot_Einc_dataset_{}.pdf'
@@ -204,7 +204,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_ratio_error), dup(1+geant_ratio_error), step='post', color='k', alpha=0.2 )
@@ -262,7 +262,7 @@ def plot_E_layers(hlfs, reference_class, arg, labels, input_names, p_label):
 
             #ax[0].set_title("Energy deposited in layer {}".format(key))
             ax[0].set_ylabel(r'a.u.')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[2].set_xlabel(f'$E_{{{key}}}$ [MeV]')
             ax[0].set_yscale('log'), ax[0].set_xscale('log')
             ax[1].set_xscale('log')
@@ -293,7 +293,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -356,7 +356,7 @@ def plot_ECEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[2].set_xlabel(f'$\\langle\\eta\\rangle_{{{key}}}$ [mm]')
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='lower center', frameon=False, title=p_label, handlelength=1.2, title_fontsize=18, fontsize=16)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
@@ -385,7 +385,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -448,7 +448,7 @@ def plot_ECPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             ax[2].set_xlabel(f"$\\langle\\phi\\rangle_{{{key}}}$ [mm]")
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='lower center', frameon=False, title=p_label, handlelength=1.2, title_fontsize=18, fontsize=16)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
@@ -477,7 +477,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -540,7 +540,7 @@ def plot_ECWidthEtas(hlfs, reference_class, arg, labels, input_names, p_label):
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\eta$ in layer {}".format(key))
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.2, fontsize=16, title_fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
      
@@ -569,7 +569,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -632,7 +632,7 @@ def plot_ECWidthPhis(hlfs, reference_class, arg, labels, input_names, p_label):
             #ax[0].set_title(r"Width of Center of Energy in $\Delta\phi$ in layer {}".format(key))
             ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='lower left', frameon=False, title=p_label, handlelength=1.2, fontsize=16, title_fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
 
@@ -657,7 +657,7 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -720,7 +720,7 @@ def plot_weighted_depth_r(hlfs, reference_hlf, arg, labels, input_names, p_label
             ax[2].set_xlabel(r"$d_{\alpha_{"+str(key)+"}}$")
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.2, fontsize=16, title_fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(reference_hlf.num_alpha[0]) == 0:
@@ -747,7 +747,7 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -810,7 +810,7 @@ def plot_weighted_depth_a(hlfs, reference_class, arg, labels, input_names, p_lab
             ax[2].set_xlabel(r"$d_{r_{"+str(key)+"}}$")
             #ax[0].set_xlim(*lim)
             ax[0].set_yscale('log')
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].legend(loc='upper right', frameon=False, title=p_label, handlelength=1.2, fontsize=16, title_fontsize=18)
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
             if (n+1)%(len(reference_class.r_edges[0])-1)==0:
@@ -836,7 +836,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
             geant_ratio_error_isnan = np.isnan(geant_ratio_error)
             geant_ratio_error[geant_ratio_error_isnan] = 0.
             geant_delta_err = geant_ratio_error*100
-            ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+            ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                             alpha=0.8, linewidth=1.0, color='k', where='post')
             ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
             ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -894,7 +894,7 @@ def plot_sparsity(hlfs, reference_class, arg, labels, input_names, p_label):
             #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
             ax[2].set_ylabel(r"$\delta [\%]$")
 
-            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+            ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
             ax[0].set_ylabel(r'a.u.')
             ax[2].set_xlabel(f"$\\lambda_{{{key}}}$")
             #plt.yscale('log')
@@ -921,7 +921,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     geant_ratio_error_isnan = np.isnan(geant_ratio_error)
     geant_ratio_error[geant_ratio_error_isnan] = 0.
     geant_delta_err = geant_ratio_error*100
-    ax[0].step(bins, dup(counts_ref_norm), label='Geant', linestyle='-',
+    ax[0].step(bins, dup(counts_ref_norm), label='Geant4', linestyle='-',
                         alpha=0.8, linewidth=1.0, color='k', where='post')
     ax[0].fill_between(bins, dup(counts_ref_norm+geant_error), dup(counts_ref_norm-geant_error), step='post', color='k', alpha=0.2)
     ax[1].fill_between(bins, dup(1-geant_error/counts_ref_norm), dup(1+geant_error/counts_ref_norm), step='post', color='k', alpha=0.2 )
@@ -964,7 +964,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     ax[1].set_yticks((0.7, 1.0, 1.3))
     ax[1].set_ylim(0.5, 1.5)
     ax[0].set_xlim(bins[0]+2*arg.min_energy, bins[-1])
-    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')
 
     ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
     ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
@@ -979,7 +979,7 @@ def plot_cell_dist(list_showers, ref_shower_arr, arg, labels, input_names, p_lab
     #ax[2].axhspan(0, 1.0, facecolor="#cccccc", alpha=0.3)
     ax[2].set_ylabel(r"$\delta [\%]$")
 
-    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')    
+    ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant4}}$')    
     ax[0].set_ylabel(r'a.u.')
     ax[2].set_xlabel(r'$E$ [MeV]')
     ax[0].set_yscale('log')
