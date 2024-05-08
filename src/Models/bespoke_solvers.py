@@ -50,6 +50,7 @@ class BespokeSolver(nn.Module):
         self.num_steps = params['num_steps']
         self.L_tau = params.get('L_tau', 1.)
         self.truth_kwargs = params.get('truth_kwargs', None)
+        print("solver args: ", self.truth_kwargs)
         self.loss = params.get('loss', 'gte_bound')
         self.checkpoint_grads = params.get('checkpoint_grads', False)
         

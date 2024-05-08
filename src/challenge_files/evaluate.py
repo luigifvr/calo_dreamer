@@ -495,7 +495,7 @@ class args_class:
         self.cls_lr = params.get("eval_cls_lr", 2.e-4)
         self.cls_batch_size = params.get("eval_cls_batch_size", 1000)
         self.cls_n_epochs = params.get("eval_cls_n_epochs", 100)
-        self.save_mem = params.get("eval_cls_save_mem", False)
+        self.save_mem = params.get("eval_cls_save_mem", True)
 
 def run_from_py(sample, energy, doc, params):
     print("Running evaluation script run_from_py:")
