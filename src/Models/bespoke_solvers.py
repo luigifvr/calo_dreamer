@@ -10,6 +10,7 @@ from abc import abstractmethod
 from documenter import Documenter
 from Models import TBD
 from Util.util import load_params, set_scheduler
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint
 
@@ -51,11 +52,14 @@ class BespokeSolver(nn.Module):
         self.truth_kwargs = params.get('truth_kwargs', None)
         self.loss = params.get('loss', 'gte_bound')
         self.checkpoint_grads = params.get('checkpoint_grads', False)
+        
+        self.buffer_len = params.get('buffer_len', 0)
+        self.buffer_rep = params.get('buffer_rep', 1)
 
         self.init_params()
         self.load_flow_models()
         self.cast_shape = [-1] + [1]*(1+len(self.shape))
-        
+
     @abstractmethod
     def init_params():
         pass
@@ -129,19 +133,27 @@ class BespokeSolver(nn.Module):
 
     def lte_loss(self, x, cond=None):
 
+        if self.params.get('model') == 'BespokeNonStationary':
+            solve_path = self.step_parallel(x[:-1], cond)
+        else:
+            solve_path = self.step(x[:-1], cond)
         # Eq. 24
         d = torch.sqrt(torch.mean(
-            (x[1:] - self.step(x[:-1], cond))**2, dim=list(range(2, x.ndim))
+            (x[1:] - solve_path)**2, dim=list(range(2, x.ndim))
         ))
         
         return d.sum(0)
     
     def gte_loss(self, x_true, x0, cond=None):
         x_sol = self.solve(x0=x0, cond=cond)
-        rmse = torch.sqrt(torch.mean(
+        # rmse = torch.sqrt(torch.mean(
+        #     (x_true - x_sol)**2, dim=list(range(1, x_sol.ndim))
+        # ))
+        # return rmse
+        mse = torch.mean(
             (x_true - x_sol)**2, dim=list(range(1, x_sol.ndim))
-        ))
-        return rmse
+        )
+        return mse
 
     def forward(self, cond=None, batch_size=None):
         """
@@ -158,16 +170,16 @@ class BespokeSolver(nn.Module):
             t_sol = torch.tensor(
                 [0, 1], dtype=torch.float32, device=self.device
             )
-            with torch.inference_mode():
+            with torch.no_grad():
                 x_true = odeint(f, x0, t_sol, **self.truth_kwargs)[-1]
 
             loss = self.gte_loss(x_true, x0, cond)
             if self.loss == 'log_gte':
-                loss = -loss.log()
+                loss = loss.log()
 
             return loss
         
-        with torch.inference_mode():
+        with torch.no_grad():
             t_stop = self.t_sol.detach()
             x_true = odeint(f, x0, t_stop, **self.truth_kwargs)
             vel =  f(t_stop, x_true)
@@ -255,56 +267,78 @@ class BespokeSolver(nn.Module):
         """
         
         self.prepare_training()
-        cond_generator = self.condition_generator(
-            self.iterations, self.params.get('batch_size', 1)
-        )
 
-        # loop over conditions
+        batch_size = self.params.get('batch_size', 1)
+
+        # early stopping
         loss_buffer = []
         loss_window = self.params.get('loss_window', 300)
         prev_window_loss = None
-        for i, c in enumerate(cond_generator):
+
+        it = 0
+        online_cond_generator = self.condition_generator(self.iterations, batch_size)
+        while it < self.iterations:
             
-            # standard forward/backward passes
-            self.optimizer.zero_grad(set_to_none=True)
-            loss = self.forward(c).mean()
-            loss.backward()
-            self.optimizer.step()
-            if hasattr(self, 'scheduler'):
-                self.scheduler.step()
+            # create condition loader:
+            if not self.buffer_len:
+                conds = online_cond_generator
+            else:
+                sample_batch_size = self.buffer_len * batch_size # total paths in buffer
+                sample_its = 1
+                while sample_batch_size > 10_000: # limit batch size to 10_000
+                    sample_its *= 2
+                    sample_batch_size /= 2
+                cond_tensor = torch.vstack( # stack conditions into tensor
+                    [c for c in self.condition_generator(sample_its, int(sample_batch_size))]
+                )
+                conds = DataLoader(cond_tensor, batch_size=batch_size, shuffle=True)
+                
+            # loop over (buffered) conditions
+            for _ in range(self.buffer_rep):
+                for c in conds:
 
-            # log
-            if self.log:
-                self.logger.add_scalar('train_losses', loss.item(), i)
-                if hasattr(self, 'scheduler'):
-                    self.logger.add_scalar(
-                        'learning_rate', self.scheduler.get_last_lr()[0], i
-                    )
+                    # standard forward/backward passes
+                    self.optimizer.zero_grad(set_to_none=True)
+                    loss = self.forward(c).mean()
+                    loss.backward()
+                    self.optimizer.step()
+                    if hasattr(self, 'scheduler'):
+                        self.scheduler.step()
 
-            # moving average loss for early stopping
-            loss_buffer.append(loss.item())
-            if i and not (i%loss_window):
-                average = np.mean(loss_buffer)
-                loss_buffer.clear()
-                if average < (prev_window_loss or 1e10):
-                    # save best model
-                    print(
-                        f'train_model: Saving best model (loss={average})',
-                        flush=True
-                    )
-                    torch.save(
-                        {'solver_params': self.state_dict()},
-                        self.doc.get_file('model.pt')
-                    )
-                    prev_window_loss = average
-                else:
-                    print(f'Early stopping after {i} iterations.')
-                    break
+                    # log
+                    if self.log:
+                        self.logger.add_scalar('train_losses', loss.item(), it)
+                        if hasattr(self, 'scheduler'):
+                            self.logger.add_scalar(
+                                'learning_rate', self.scheduler.get_last_lr()[0], it
+                            )
 
-        # generate and plot samples
-        if self.params.get('sample', True):
-            samples, c = self.sample_n()
-            self.plot_samples(samples=samples, conditions=c)     
+                    # moving average loss for early stopping
+                    loss_buffer.append(loss.item())
+                    if it and not (it%loss_window):
+                        average = np.mean(loss_buffer)
+                        loss_buffer.clear()
+                        if average < (prev_window_loss or 1e10):
+                            # save best model
+                            print(
+                                f'train_model: Saving best model (loss={average})',
+                                flush=True
+                            )
+                            torch.save(
+                                {'solver_params': self.state_dict()},
+                                self.doc.get_file('model.pt')
+                            )
+                            prev_window_loss = average
+                        else:
+                            print(f'Early stopping after {it} iterations.')
+                            return
+                    
+                    it += 1
+
+        # # generate and plot samples
+        # if self.params.get('sample', True):
+        #     samples, c = self.sample_n()
+        #     self.plot_samples(samples=samples, conditions=c)
 
     @torch.inference_mode()
     def sample_n(self):
@@ -449,3 +483,100 @@ class BespokeMidpoint(BespokeSolver):
     def t_sol(self):
         """Returns integer-index time steps for the truth trajectory."""
         return self.t[::2]
+
+class BespokeNonStationary(BespokeSolver):
+
+    """
+    __init__(params, device, doc):
+        
+        params: A dictionary specifying the parameters of the solver:
+            flow       -- Path to a flow model representing the vector field to
+                       be integrated. It should have signature (x,t,c) --> x,
+                       where c is a possible condition.
+            num_steps  -- The number of integration steps to take.
+            shape      -- The shape of the state x
+            truth_kwargs -- Dictionary of keyword arguments passed to `odeint` for the
+                          gound truth solver
+        device: The device on which to store model parameters and flow network.
+        doc: A Documenter object used for logging and saving outputs
+    """
+
+    def __init__(self, params, device, doc):
+        
+        super().__init__(params, device, doc)
+        assert self.loss in ['lte', 'gte', 'log_gte']
+
+    def init_params(self):
+        self.a = nn.ParameterList([
+            nn.Parameter(torch.ones((), device=self.device), requires_grad=True)
+            for _ in range(self.num_steps)
+        ])
+        self.b = nn.ParameterList([
+            nn.Parameter(torch.full([i+1], self.h, device=self.device), requires_grad=True)
+            for i in range(self.num_steps)
+        ])
+        self.theta_t = torch.nn.Parameter(torch.ones(
+            self.num_steps-1, requires_grad=True
+        ))
+
+    def step(self, x0, xi, U, cond, i):
+        U.append(self.flow_fn(xi, self.t[i], cond))
+        return self.a[i] * x0 + torch.stack(U, -1) @ self.b[i]
+    
+    def step_parallel(self, xi, cond):
+        U = self.flow_fn(xi, self.t[:-1], cond)
+        path = [
+            self.a[i] * xi[0] + U[:i+1].movedim(0, -1) @ self.b[i]
+            for i in range(self.num_steps)
+        ]
+        return torch.stack(path)
+
+    @property
+    def t(self):
+        t = torch.linspace(0,1,len(self.theta_t)+2, device=self.device)
+        t[1:-1] = self.theta_t.abs().cumsum(0) * self.h
+        return t
+
+    @property
+    def t_sol(self):
+        """Returns integer-index time steps for the truth trajectory."""
+        return self.t          
+    
+    def solve(self, cond=None, x0=None):
+
+        if x0 is None: # assume initial state x0 follows standard normal
+            x0 = torch.randn((cond.shape[0], *self.shape), device=self.device)
+        
+        x_i, U = x0, []
+        for i in range(self.num_steps):
+            x_i = self.step(x0, x_i, U, cond, i)
+        return x_i
+    
+    def prepare_training(self):
+        
+        self.iterations = self.params['iterations']
+        print(f"train_model: Beginning training. Number of iterations set to {self.iterations}")
+
+        trainable_parameters = [p for p in self.parameters() if p.requires_grad]
+
+        # initialize optimizer
+        self.optimizer = torch.optim.Adam(
+            trainable_parameters,
+            lr=self.params.get('lr', 2e-3),
+            betas=self.params.get('betas', [0.9, 0.999]),
+            eps=self.params.get('eps', 1e-6),
+        )
+
+        # initialize scheduler
+        if self.params.get('use_scheduler', False):
+            self.params['n_epochs'] = self.iterations # avoid 'n_epochs' in config file        
+            self.scheduler = set_scheduler(self.optimizer, self.params)
+          
+        # initialize logging
+        self.log = self.params.get("log", True)
+        if self.log:
+            log_dir = self.doc.basedir
+            self.logger = SummaryWriter(log_dir)
+            print(f"train_model: Logging to log_dir {log_dir}")
+        else:
+            print('train_model: log set to False. No logs will be written')
