@@ -1,20 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib
 from matplotlib import gridspec
 
-def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num_bins=64, color='fuchsia', quantile_bins=False, skip_quantiles=0, documenter=None):
+def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num_bins=64, color="#0000cc", quantile_bins=False, skip_quantiles=0, documenter=None):
 
     # iterate layers
     for i, (ref, gen) in enumerate(zip(ref_us.T, gen_us.T)):
 
         # create figure and subaxes
-        fig, ax = plt.subplots(figsize=(5, 5))
-        main_cell, ratio_cell = gridspec.GridSpecFromSubplotSpec(
-            2, 1, subplot_spec=ax, height_ratios=[5, 1.5], hspace=0.05
-        )
-        main_ax = plt.subplot(main_cell)
-        ratio_ax = plt.subplot(ratio_cell)
-        ax.set_axis_off()
+        fig, ax = plt.subplots(3, 1, figsize=(4.5, 4), gridspec_kw={"height_ratios": (4,1,1), "hspace": 0.0}, sharex=True)
 
         # set binning
         if quantile_bins:
@@ -32,58 +27,93 @@ def plot_ui_dists(gen_us, ref_us, xlim=(-0.05, 1.05), ratio_ylim=(0.5, 1.5), num
 
         ## MAIN AXIS ##
         # plot central values 
-        ref_vals, _, _ = main_ax.hist(
+        ref_vals, _, _ = ax[0].hist(
             ref, bins=bins, density=True, histtype='step', linestyle='-',
             alpha=0.8, linewidth=1.0, color='k', label='Geant'
         )
-        gen_vals, _, _ = main_ax.hist(
+        gen_vals, _, _ = ax[0].hist(
             gen, bins=bins, density=True, histtype='step', linestyle='-',
             alpha=0.8, linewidth=1.0, color=color, label='CaloDREAM'
         )
         # plot error bars
         ref_stds = np.sqrt(ref_vals*len(ref)/bin_widths)/len(ref)
         gen_stds = np.sqrt(gen_vals*len(gen)/bin_widths)/len(gen)
-        main_ax.fill_between(
+        ax[0].fill_between(
             bin_centers, ref_vals-ref_stds, ref_vals+ref_stds, alpha=0.2,
             step='mid', color='k'
         )
-        main_ax.fill_between(
+        ax[0].fill_between(
             bin_centers, gen_vals-gen_stds, gen_vals+gen_stds, alpha=0.2,
             step='mid', color=color
         )
-        main_ax.semilogy()
-        # main_ax.set_ylim(None, min(main_ax.get_ylim()[1], 200))
-        main_ax.set_ylim(max(main_ax.get_ylim()[0], 1.1e-4), None)
-        main_ax.set_ylabel(f"Prob. density")
+        ax[0].semilogy()
+        # ax[0].set_ylim(None, min(ax[0].get_ylim()[1], 200))
+        ax[0].set_ylim(max(ax[0].get_ylim()[0], 1.1e-4), None)
+        ax[0].set_ylabel(f"Prob. density")
         
         ## RATIO AXIS ##
         norm = ref_vals
         # plot central values 
-        ratio_ax.step(
+        ax[1].step(
             bin_centers, ref_vals/norm, where='mid', linestyle='-', alpha=0.8,
             linewidth=1.0, color='k'
         )
-        ratio_ax.step(
+        ax[1].step(
             bin_centers, gen_vals/norm, where='mid', linestyle='-', alpha=0.8,
             linewidth=1.0, color=color
         )
-        ratio_ax.fill_between(
+        ax[1].fill_between(
             bin_centers, (ref_vals-ref_stds)/norm, (ref_vals+ref_stds)/norm,
             alpha=0.2, step='mid', color='k'
         )
-        ratio_ax.fill_between(
+        ax[1].fill_between(
             bin_centers, (gen_vals-gen_stds)/norm, (gen_vals+gen_stds)/norm,
             alpha=0.2, step='mid', color=color
         )
-        ratio_ax.set_ylim(*ratio_ylim)
-        ratio_ax.set_xlim(*main_ax.get_xlim())
-        ratio_ax.set_xlabel(f"$u_{{{i}}}$")
-        main_ax.set_xticklabels([])        
-        leg = main_ax.legend(frameon=False)
+        delta = np.fabs(gen_vals/norm - 1)*100
+        delta_err = gen_stds/norm*100
+        geant_delta_err = ref_stds/norm*100
+        ax[2].errorbar(bin_centers, np.zeros_like(bin_centers), 
+                       yerr=geant_delta_err, ecolor='grey',
+                       color='grey', elinewidth=0.5, linewidth=1., fmt=".", capsize=2)
 
-        for p in leg.get_patches():
-            p.set(linewidth=1.5)
+        markers, caps, bars = ax[2].errorbar(bin_centers, delta,
+                                yerr=delta_err, ecolor=color,  color=color, elinewidth=0.5,
+                                linewidth=1.0, fmt=".", capsize=2)
+
+        ax[1].set_ylim(*ratio_ylim)
+        ax[1].set_xlim(*ax[0].get_xlim())
+        ax[1].set_xlabel(f"$u_{{{i}}}$")
+        ax[0].set_xticklabels([]) 
         
+        ax[1].hlines(1.0, bins[0], bins[-1], linewidth=1.0, alpha=0.8, linestyle='-', color='k')
+        ax[1].set_yticks((0.7, 1.0, 1.3))
+        ax[1].set_ylim(0.5, 1.5)
+        ax[0].set_xlim(bins[0], bins[-1])
+
+        ax[1].axhline(0.7, c='k', ls='--', lw=0.5)
+        ax[1].axhline(1.3, c='k', ls='--', lw=0.5)
+        ax[2].set_ylim((0.05, 50))
+        ax[2].set_yscale("log")
+        ax[2].set_yticks([0.1, 1.0, 10.0])
+        ax[2].set_yticklabels([r"$0.1$", r"$1.0$", "$10.0$"])
+        ax[2].set_yticks([0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                           2., 3., 4., 5., 6., 7., 8., 9., 20., 30., 40.,], minor=True)
+
+        ax[2].axhline(y=1.0, linewidth=0.5, linestyle="--", color="grey")
+        ax[2].set_ylabel(r"$\delta [\%]$")
+
+        ax[0].set_ylabel(r'a.u.')
+        ax[2].set_xlabel(f"$u_{{{i}}}$")
+        ax[0].set_xlim(*xlim)
+        ax[0].set_yscale('log')
+        ax[1].set_ylabel(r'$\frac{\text{Model}}{\text{Geant}}$')
+        
+        handle1 = matplotlib.lines.Line2D([], [], c='k', label='Geant')
+        handle2 = matplotlib.lines.Line2D([], [], c='#0000cc', label='CaloDREAM')
+        ax[0].legend(handles=[handle1, handle2], loc='upper right', frameon=False, handlelength=1.2, title_fontsize=18, fontsize=16)
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.01, 0.01, 0.98, 0.98))
+
         if documenter is not None:
             fig.savefig(
                 documenter.get_file(f"u{i}_dist.pdf"), dpi=200, bbox_inches='tight'
