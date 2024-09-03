@@ -1,7 +1,7 @@
 # CaloDream
 
 A repository for fast detector simulation using Conditional Flow Matching.
-This is the reference code for CaloDREAM arXiv:XXXX and the corresponding 
+This is the reference code for CaloDREAM [arXiv:2405.09629](https://arxiv.org/abs/2405.09629) and the corresponding 
 entry in the Calochallenge.
 
 ## Usage
