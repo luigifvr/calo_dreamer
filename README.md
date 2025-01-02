@@ -4,6 +4,9 @@ A repository for fast detector simulation using Conditional Flow Matching.
 This is the reference code for CaloDREAM [arXiv:2405.09629](https://arxiv.org/abs/2405.09629) and the corresponding 
 entry in the Calochallenge.
 
+Samples used for the evaluation of the networks are published in the Zenodo repository 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14413047.svg)](https://doi.org/10.5281/zenodo.14413047)
+
 ## Usage
 
 Training:
