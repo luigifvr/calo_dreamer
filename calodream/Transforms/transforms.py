@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 import os
-from itertools import pairwise
 
-# from challenge_files import *
-from . import XMLHandler
+from challenge_files import *
+from challenge_files import XMLHandler
+from itertools import pairwise
 
 def logit(array, alpha=1.e-6, inv=False):
     if inv:
@@ -134,7 +134,25 @@ class ScaleVoxels(object):
         else:
             transformed = shower*self.factor
         return transformed, energy
-    
+
+class ScaleTotalEnergy(object):
+    """
+    Scale only E_tot/E_inc by a factor f.
+    The effect is the same of ScaleVoxels but
+    it is applied in a different position in the
+    preprocessing chain.
+    """
+    def __init__(self, factor, n_layers=45):
+        self.factor = factor
+        self.n_layers = n_layers
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            shower[..., -self.n_layers] /= self.factor
+        else:
+            shower[..., -self.n_layers] *= self.factor
+        return shower, energy
+
 class ScaleEnergy(object):
     """
     Scale incident energies to lie in the range [0, 1]
@@ -353,7 +371,24 @@ class CutValues(object):
     """
     Cut in Normalized space
         cut: threshold value for the cut
+        n_layers: number of layers to avoid cutting on the us
     """
+    def __init__(self, cut=0., n_layers=45):
+        self.cut = cut
+        self.n_layers = n_layers
+
+    def __call__(self, shower, energy, rev=False):
+        if rev:
+            mask = (shower <= self.cut)
+            mask[:, -self.n_layers:] = False
+            transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
+        else:
+            transformed = shower
+        return transformed, energy        
+
+class CutBothValues(object):
     def __init__(self, cut=0.):
         self.cut = cut
 
@@ -364,7 +399,10 @@ class CutValues(object):
             if self.cut:
                 transformed[mask] = 0.0 
         else:
+            mask = (shower <= self.cut)
             transformed = shower
+            if self.cut:
+                transformed[mask] = 0.0 
         return transformed, energy        
 
 class ZeroMask(object):
@@ -457,11 +495,12 @@ class NormalizeByElayer(object):
        layer_boundaries: ''
        eps: numerical epsilon
     """
-    def __init__(self, ptype, xml_file, eps=1.e-10):
+    def __init__(self, ptype, xml_file, cut=0.0, eps=1.e-10):
         self.eps = eps
-        self.xml = XMLHandler.XMLHandler(ptype, xml_file)
+        self.xml = XMLHandler.XMLHandler(xml_file, ptype)
         self.layer_boundaries = np.unique(self.xml.GetBinEdges())
         self.n_layers = len(self.layer_boundaries) - 1
+        self.cut = cut
 
     def __call__(self, shower, energy, rev=False):
         if rev:
@@ -495,6 +534,8 @@ class NormalizeByElayer(object):
             for l, (start, end) in enumerate(pairwise(self.layer_boundaries)):
                 layer = shower[:, start:end] # select layer
                 layer /= layer.sum(-1, keepdims=True) + self.eps # normalize to unity
+                mask = (layer <= self.cut)
+                layer[mask] = 0.0 # apply normalized cut
                 transformed[:, start:end] = layer * layer_Es[:,[l]] # scale to layer energy
 
         else:
@@ -517,6 +558,7 @@ class NormalizeByElayer(object):
             transformed = torch.cat((shower, extra_dims), dim=1)
 
         return transformed, energy
+
 class AddCoordChannels(object):
     """
     Add channel to image containing the coordinate value along particular
