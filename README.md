@@ -1,4 +1,6 @@
 # CaloDream
+> [!WARNING]
+> This code was used to generate the CaloDREAM submission to the CaloChallenge. A new version, with more features, is available at [https://github.com/luigifvr/vit4hep](https://github.com/luigifvr/vit4hep).
 
 A repository for fast detector simulation using Conditional Flow Matching.
 This is the reference code for CaloDREAM [arXiv:2405.09629](https://arxiv.org/abs/2405.09629) and the corresponding 
